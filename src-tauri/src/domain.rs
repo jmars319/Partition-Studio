@@ -11,7 +11,7 @@ impl ExecutionStatus {
     pub fn disabled() -> Self {
         Self {
             enabled: false,
-            reason: "Execution is not available until tested through Partition Lab.".to_string(),
+            reason: "Execution is not available until tested through tenra Partition Lab.".to_string(),
         }
     }
 }

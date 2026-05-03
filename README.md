@@ -1,12 +1,12 @@
-# Partition Studio
+# tenra Partition Studio
 
-Partition Studio is a future desktop partition management app focused on safe planning, visualization, simulation, and later controlled execution through a separate tested backend.
+tenra Partition Studio is a future desktop partition management app focused on safe planning, visualization, simulation, and later controlled execution through a separate tested backend.
 
 The initial app is intentionally read-only. It does not run disk commands and it does not implement destructive writes.
 
 ## Windows First
 
-Partition Studio is Windows-compatible from day one, even when developed from macOS.
+tenra Partition Studio is Windows-compatible from day one, even when developed from macOS.
 
 - Windows is the primary desktop target.
 - All npm scripts are shell-portable and work from PowerShell or Command Prompt.
@@ -20,7 +20,7 @@ Partition Studio is Windows-compatible from day one, even when developed from ma
 - Rust backend with execution explicitly disabled
 - React and TypeScript frontend
 - Mock JSON disk scanner abstraction
-- Partition Lab-compatible layout import
+- tenra Partition Lab-compatible layout import
 - Operation planner for giving space from `E:` to `C:`
 - In-memory simulation engine
 - Safety validator and refusal cases
@@ -54,7 +54,7 @@ This is not treated as a simple shrink/extend workflow. Shrinking `E:` creates u
 ```text
 src/          React UI, domain model, planner, simulator, import/export helpers
 src-tauri/    Tauri Rust shell and non-execution backend status
-fixtures/     Partition Lab-style JSON fixtures
+fixtures/     tenra Partition Lab-style JSON fixtures
 docs/         Architecture and safety notes
 tests/        Vitest planner, simulator, and refusal tests
 ```
@@ -76,4 +76,4 @@ For Windows setup details, see [docs/windows.md](docs/windows.md).
 
 ## Safety Boundary
 
-Partition Studio does not currently execute partition operations. The Execute control is disabled and the Rust backend exposes only a disabled execution status. Real execution must wait until Partition Lab can validate operations against disposable disk images.
+tenra Partition Studio does not currently execute partition operations. The Execute control is disabled and the Rust backend exposes only a disabled execution status. Real execution must wait until tenra Partition Lab can validate operations against disposable disk images.

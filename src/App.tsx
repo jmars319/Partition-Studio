@@ -33,7 +33,7 @@ import { cloneDisk, getPartitionEnd, sortPartitions } from "./domain/layout";
 
 const fixtureDisk = loadDiskFromPartitionLabExport(labFixture);
 const EXECUTION_DISABLED_REASON =
-  "Execution is not available until tested through Partition Lab.";
+  "Execution is not available until tested through tenra Partition Lab.";
 
 type ExportFormat = "plan-json" | "report-json" | "summary";
 
@@ -113,7 +113,7 @@ function App() {
             PS
           </div>
           <div>
-            <h1>Partition Studio</h1>
+            <h1>tenra Partition Studio</h1>
             <p>Read-only planner</p>
           </div>
         </div>

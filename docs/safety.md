@@ -1,6 +1,6 @@
 # Safety Notes
 
-Partition Studio is not production-safe partitioning software. The initial implementation is a read-only visualizer, operation planner, and simulator.
+tenra Partition Studio is not production-safe partitioning software. The initial implementation is a read-only visualizer, operation planner, and simulator.
 
 The safety validator currently detects:
 

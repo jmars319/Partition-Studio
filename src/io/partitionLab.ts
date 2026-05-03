@@ -10,7 +10,7 @@ export interface PartitionLabDiskLayout {
 
 export function loadDiskFromPartitionLabExport(input: unknown): Disk {
   if (!isPartitionLabDiskLayout(input)) {
-    throw new Error("Expected Partition Lab disk layout JSON with schema partition-lab.disk-layout.v1.");
+    throw new Error("Expected tenra Partition Lab disk layout JSON with schema partition-lab.disk-layout.v1.");
   }
 
   return input.disk;
@@ -42,7 +42,7 @@ export function exportSafetyReport(report: SafetyReport): string {
 
 export function createHumanReadableSummary(plan: OperationPlan): string {
   const lines = [
-    "Partition Studio operation summary",
+    "tenra Partition Studio operation summary",
     "",
     `Workflow: Give ${formatBytes(plan.requestedExpansionBytes)} from E: to C:`,
     `Status: ${plan.status}`,
@@ -64,7 +64,7 @@ export function createHumanReadableSummary(plan: OperationPlan): string {
         )),
     "",
     "Execution:",
-    "Execution is not available until tested through Partition Lab.",
+    "Execution is not available until tested through tenra Partition Lab.",
   ];
 
   return lines.join("\n");

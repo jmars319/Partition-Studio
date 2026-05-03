@@ -1,8 +1,8 @@
 [package]
 name = "partition-studio"
 version = "0.1.0"
-description = "Read-only partition planning and simulation studio"
-authors = ["JAMARQ"]
+description = "tenra Partition Studio read-only planning and simulation studio"
+authors = ["tenra"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

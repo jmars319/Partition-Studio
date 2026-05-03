@@ -9,7 +9,7 @@ fn execution_status() -> domain::ExecutionStatus {
 fn supported_scanner_adapters() -> Vec<domain::ScannerAdapterStatus> {
     vec![
         domain::ScannerAdapterStatus::mock_json(),
-        domain::ScannerAdapterStatus::future("Partition Lab JSON import"),
+        domain::ScannerAdapterStatus::future("tenra Partition Lab JSON import"),
         domain::ScannerAdapterStatus::future("Windows PowerShell Storage module"),
         domain::ScannerAdapterStatus::future("Linux lsblk/parted/sgdisk"),
         domain::ScannerAdapterStatus::future("macOS diskutil"),
