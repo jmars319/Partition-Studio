@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tenra Partition Lab</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="tenra Partition Lab navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">PL</div>
+          <div>
+            <h1>tenra Partition Lab</h1>
+            <p>Mock planning console</p>
+          </div>
+        </div>
+
+        <nav class="nav-stack" aria-label="Sections">
+          <a href="#planner" class="nav-link active">Planner</a>
+          <a href="#layout" class="nav-link">Layout</a>
+          <a href="#process" class="nav-link">Process</a>
+          <a href="#results" class="nav-link">Results</a>
+        </nav>
+
+        <div class="safety-panel">
+          <h2>Safety State</h2>
+          <div id="safetyModes" class="safety-list"></div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <h2>Lab Operator Dashboard</h2>
+            <p id="scenarioSummary">Loading fixtures...</p>
+          </div>
+          <div class="topbar-actions">
+            <button id="refreshButton" type="button" class="button secondary">Refresh</button>
+            <button id="runPlanButton" type="button" class="button primary">Run Plan</button>
+          </div>
+        </header>
+
+        <section id="planner" class="panel planner-grid" aria-labelledby="plannerTitle">
+          <div>
+            <h3 id="plannerTitle">Operation Input</h3>
+            <div class="field-grid">
+              <label>
+                Scenario
+                <select id="fixtureSelect"></select>
+              </label>
+              <label>
+                Increase C By
+                <input id="increaseInput" type="text" value="40G" autocomplete="off" />
+              </label>
+              <label>
+                Source
+                <input id="sourceInput" type="text" value="E" maxlength="8" autocomplete="off" />
+              </label>
+              <label>
+                Target
+                <input id="targetInput" type="text" value="C" maxlength="8" autocomplete="off" />
+              </label>
+            </div>
+          </div>
+
+          <div class="command-strip" aria-label="Available actions">
+            <button id="simulateButton" type="button" class="tool-button">Simulate Process</button>
+            <button id="verifyButton" type="button" class="tool-button">Verify Mock Result</button>
+            <button id="clearButton" type="button" class="tool-button quiet">Clear Output</button>
+          </div>
+        </section>
+
+        <section id="layout" class="panel" aria-labelledby="layoutTitle">
+          <div class="section-header">
+            <div>
+              <h3 id="layoutTitle">Disk Layout</h3>
+              <p id="layoutMeta">No layout loaded.</p>
+            </div>
+            <div id="planStatus" class="status-pill neutral">Idle</div>
+          </div>
+          <div id="diskMap" class="disk-map" aria-label="Disk map"></div>
+          <div id="partitionTable" class="partition-table"></div>
+        </section>
+
+        <section id="process" class="panel" aria-labelledby="processTitle">
+          <div class="section-header">
+            <div>
+              <h3 id="processTitle">Process Queue</h3>
+              <p>Read-only planning steps first, write steps remain guarded.</p>
+            </div>
+            <div id="processClock" class="status-pill neutral">Waiting</div>
+          </div>
+          <ol id="processQueue" class="process-list"></ol>
+        </section>
+
+        <section id="results" class="results-grid" aria-label="Results">
+          <div class="panel">
+            <div class="section-header">
+              <div>
+                <h3>Blockers & Checks</h3>
+                <p id="resultSummary">Run a plan to populate results.</p>
+              </div>
+            </div>
+            <div id="checksList" class="checks-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="section-header">
+              <div>
+                <h3>Plan Details</h3>
+                <p>Structured response from the local planning API.</p>
+              </div>
+            </div>
+            <pre id="jsonOutput" class="json-output">{}</pre>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "schema": "partition-lab.layout.v1",
+  "scenario": "mbr-layout",
+  "mode": "mock",
+  "description": "MBR layout that keeps the same C then E ordering but exercises non-GPT validation paths.",
+  "disk": {
+    "id": "mock-disk0",
+    "path": "mock://mbr-layout",
+    "label": "mbr",
+    "sector_size": 512,
+    "alignment_sectors": 2048,
+    "size_bytes": 214748364800,
+    "partitions": [
+      {
+        "number": 1,
+        "label": "C",
+        "name": "C",
+        "type": "primary",
+        "start_sector": 2048,
+        "end_sector": 83888127,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 41875931136,
+        "free_bytes": 1073741824,
+        "files": [
+          "/Windows/System32/mock.bin"
+        ]
+      },
+      {
+        "number": 2,
+        "label": "E",
+        "name": "E",
+        "type": "primary",
+        "start_sector": 83888128,
+        "end_sector": 377489407,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 53687091200,
+        "free_bytes": 96636764160,
+        "files": [
+          "/data/projects/archive-001.bin",
+          "/data/checksums/manifest.sha256"
+        ]
+      }
+    ],
+    "free_regions": [
+      {
+        "start_sector": 377489408,
+        "end_sector": 419430366,
+        "size_bytes": 21473771008
+      }
+    ]
+  }
+}

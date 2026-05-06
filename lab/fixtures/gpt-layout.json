@@ -1,0 +1,53 @@
+{
+  "schema": "partition-lab.layout.v1",
+  "scenario": "gpt-layout",
+  "mode": "mock",
+  "description": "Generic GPT layout for exercising partition-table handling.",
+  "disk": {
+    "id": "mock-disk0",
+    "path": "mock://gpt-layout",
+    "label": "gpt",
+    "sector_size": 512,
+    "alignment_sectors": 2048,
+    "size_bytes": 274877906944,
+    "partitions": [
+      {
+        "number": 1,
+        "label": "C",
+        "name": "C",
+        "type": "msftdata",
+        "start_sector": 2048,
+        "end_sector": 125831167,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 62277025792,
+        "free_bytes": 2147483648,
+        "files": [
+          "/Windows/System32/mock.bin"
+        ]
+      },
+      {
+        "number": 2,
+        "label": "E",
+        "name": "E",
+        "type": "msftdata",
+        "start_sector": 125831168,
+        "end_sector": 251660287,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 32212254720,
+        "free_bytes": 32212254720,
+        "files": [
+          "/data/projects/archive-001.bin"
+        ]
+      }
+    ],
+    "free_regions": [
+      {
+        "start_sector": 251660288,
+        "end_sector": 536870878,
+        "size_bytes": 146028846592
+      }
+    ]
+  }
+}

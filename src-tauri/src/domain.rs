@@ -11,7 +11,7 @@ impl ExecutionStatus {
     pub fn disabled() -> Self {
         Self {
             enabled: false,
-            reason: "Execution is not available until tested through tenra Partition Lab."
+            reason: "Execution is not available until the integrated lab harness proves the operation against disposable images."
                 .to_string(),
         }
     }

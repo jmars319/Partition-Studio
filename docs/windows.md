@@ -1,6 +1,6 @@
 # Windows Development
 
-Windows is the primary target for tenra Partition Studio. macOS development is supported, but new code should be checked against Windows assumptions before it lands.
+Windows is the primary target for tenra Partition. macOS development is supported, but new code should be checked against Windows assumptions before it lands.
 
 ## Required Tooling
 
@@ -36,5 +36,5 @@ npm run tauri dev
 - Do not add Bash-only scripts or Unix-only command assumptions.
 - Do not hard-code absolute paths from macOS or Linux.
 - Do not call real disk commands from the app.
-- Future disk scanning should start with imported tenra Partition Lab JSON, then a Windows PowerShell Storage module adapter.
-- Future destructive execution must remain outside this UI until tenra Partition Lab proves operations against disposable disk images.
+- Future disk scanning should start with imported integrated-lab JSON, then a Windows PowerShell Storage module adapter.
+- Future destructive execution must remain outside the UI until the integrated lab harness proves operations against disposable disk images.

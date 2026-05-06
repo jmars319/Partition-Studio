@@ -1,0 +1,55 @@
+{
+  "schema": "partition-lab.layout.v1",
+  "scenario": "non-adjacent-free-space",
+  "mode": "mock",
+  "description": "Free space exists after E, not after C. C cannot consume it until E is moved right.",
+  "disk": {
+    "id": "mock-disk0",
+    "path": "mock://non-adjacent-free-space",
+    "label": "gpt",
+    "sector_size": 512,
+    "alignment_sectors": 2048,
+    "size_bytes": 343597383680,
+    "partitions": [
+      {
+        "number": 1,
+        "label": "C",
+        "name": "C",
+        "type": "msftdata",
+        "start_sector": 2048,
+        "end_sector": 167774207,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 83751862272,
+        "free_bytes": 2147483648,
+        "files": [
+          "/Windows/System32/mock.bin",
+          "/Users/LabUser/fill-c-01.dat"
+        ]
+      },
+      {
+        "number": 2,
+        "label": "E",
+        "name": "E",
+        "type": "msftdata",
+        "start_sector": 167774208,
+        "end_sector": 545261567,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 64424509440,
+        "free_bytes": 128849018880,
+        "files": [
+          "/data/projects/archive-001.bin",
+          "/data/checksums/manifest.sha256"
+        ]
+      }
+    ],
+    "free_regions": [
+      {
+        "start_sector": 545261568,
+        "end_sector": 671088606,
+        "size_bytes": 64423444480
+      }
+    ]
+  }
+}

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    partition_studio_lib::run()
+    tenra_partition_lib::run()
 }

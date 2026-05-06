@@ -36,7 +36,7 @@ import { cloneDisk, getPartitionEnd, sortPartitions } from "./domain/layout";
 const fixtureDisk = loadDiskFromPartitionLabExport(labFixture);
 const fixtureLabMetadata = readPartitionLabMetadata(labFixture);
 const EXECUTION_DISABLED_REASON =
-  "Execution is not available until tested through tenra Partition Lab.";
+  "Execution is not available until the integrated lab harness proves this operation against disposable images.";
 
 type ExportFormat = "plan-json" | "report-json" | "summary";
 
@@ -116,10 +116,10 @@ function App() {
       <aside className="sidebar">
         <div className="brand-lockup">
           <div className="brand-mark" aria-hidden="true">
-            PS
+            TP
           </div>
           <div>
-            <h1>tenra Partition Studio</h1>
+            <h1>tenra Partition</h1>
             <p>Read-only planner</p>
           </div>
         </div>
@@ -135,7 +135,7 @@ function App() {
           </button>
           <button className="workflow-item" type="button">
             <ShieldCheck size={18} />
-            <span>Lab validation visible</span>
+            <span>Lab harness visible</span>
           </button>
         </nav>
 
@@ -181,7 +181,7 @@ function App() {
 
         <section className="sidebar-section boundary-note">
           <h2>Boundary</h2>
-          <p>Studio is the user-facing planner. Lab remains the disposable-image validation harness.</p>
+          <p>The planner and lab harness now live in one app. Execution stays locked until disposable-image validation proves the workflow.</p>
         </section>
       </aside>
 

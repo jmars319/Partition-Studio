@@ -16,7 +16,7 @@ export interface PartitionLabMetadata {
 
 export function loadDiskFromPartitionLabExport(input: unknown): Disk {
   if (!isPartitionLabDiskLayout(input)) {
-    throw new Error("Expected tenra Partition Lab disk layout JSON with schema partition-lab.disk-layout.v1.");
+    throw new Error("Expected tenra Partition lab disk layout JSON with schema partition-lab.disk-layout.v1.");
   }
 
   return input.disk;
@@ -24,7 +24,7 @@ export function loadDiskFromPartitionLabExport(input: unknown): Disk {
 
 export function readPartitionLabMetadata(input: unknown): PartitionLabMetadata {
   if (!isPartitionLabDiskLayout(input)) {
-    throw new Error("Expected tenra Partition Lab disk layout JSON with schema partition-lab.disk-layout.v1.");
+    throw new Error("Expected tenra Partition lab disk layout JSON with schema partition-lab.disk-layout.v1.");
   }
 
   return {
@@ -37,7 +37,7 @@ export function readPartitionLabMetadata(input: unknown): PartitionLabMetadata {
 export function exportOperationPlan(plan: OperationPlan): string {
   return JSON.stringify(
     {
-      schema: "partition-studio.operation-plan.v1",
+      schema: "tenra-partition.operation-plan.v1",
       exportedAt: new Date().toISOString(),
       plan,
     },
@@ -49,7 +49,7 @@ export function exportOperationPlan(plan: OperationPlan): string {
 export function exportSafetyReport(report: SafetyReport): string {
   return JSON.stringify(
     {
-      schema: "partition-studio.safety-report.v1",
+      schema: "tenra-partition.safety-report.v1",
       exportedAt: new Date().toISOString(),
       report,
     },
@@ -60,7 +60,7 @@ export function exportSafetyReport(report: SafetyReport): string {
 
 export function createHumanReadableSummary(plan: OperationPlan): string {
   const lines = [
-    "tenra Partition Studio operation summary",
+    "tenra Partition operation summary",
     "",
     `Workflow: Give ${formatBytes(plan.requestedExpansionBytes)} from E: to C:`,
     `Status: ${plan.status}`,
@@ -82,7 +82,7 @@ export function createHumanReadableSummary(plan: OperationPlan): string {
         )),
     "",
     "Execution:",
-    "Execution is not available until tested through tenra Partition Lab.",
+    "Execution is not available until the integrated lab harness proves the operation against disposable images.",
   ];
 
   return lines.join("\n");

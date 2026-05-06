@@ -1,0 +1,57 @@
+{
+  "schema": "partition-lab.layout.v1",
+  "scenario": "interrupted-operation-placeholder",
+  "mode": "mock",
+  "description": "Placeholder for a partially completed operation. Future recovery tests should reason about this state before writes.",
+  "disk": {
+    "id": "mock-disk0",
+    "path": "mock://interrupted-operation-placeholder",
+    "label": "gpt",
+    "sector_size": 512,
+    "alignment_sectors": 2048,
+    "size_bytes": 343597383680,
+    "operation_state": "interrupted-placeholder",
+    "partitions": [
+      {
+        "number": 1,
+        "label": "C",
+        "name": "C",
+        "type": "msftdata",
+        "start_sector": 2048,
+        "end_sector": 167774207,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 83751862272,
+        "free_bytes": 2147483648,
+        "files": [
+          "/Windows/System32/mock.bin"
+        ]
+      },
+      {
+        "number": 2,
+        "label": "E",
+        "name": "E",
+        "type": "msftdata",
+        "start_sector": 251660288,
+        "end_sector": 629147647,
+        "filesystem": "unknown-after-interruption",
+        "mountpoint": null,
+        "used_bytes": null,
+        "free_bytes": null,
+        "files": []
+      }
+    ],
+    "free_regions": [
+      {
+        "start_sector": 167774208,
+        "end_sector": 251660287,
+        "size_bytes": 42949672960
+      },
+      {
+        "start_sector": 629147648,
+        "end_sector": 671088606,
+        "size_bytes": 21473771008
+      }
+    ]
+  }
+}

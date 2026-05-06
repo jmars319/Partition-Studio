@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tenra Partition Studio",
+  "productName": "tenra Partition",
   "version": "0.1.0",
-  "identifier": "co.tenra.partitionstudio",
+  "identifier": "co.tenra.partition",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "tenra Partition Studio",
+        "title": "tenra Partition",
         "width": 1280,
         "height": 820,
         "minWidth": 1040,

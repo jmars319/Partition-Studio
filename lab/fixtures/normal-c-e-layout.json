@@ -1,0 +1,56 @@
+{
+  "schema": "partition-lab.layout.v1",
+  "scenario": "normal-c-e-layout",
+  "mode": "mock",
+  "description": "GPT disk with nearly full C followed immediately by a large NTFS E with enough free space.",
+  "disk": {
+    "id": "mock-disk0",
+    "path": "mock://normal-c-e-layout",
+    "label": "gpt",
+    "sector_size": 512,
+    "alignment_sectors": 2048,
+    "size_bytes": 343597383680,
+    "partitions": [
+      {
+        "number": 1,
+        "label": "C",
+        "name": "C",
+        "type": "msftdata",
+        "start_sector": 2048,
+        "end_sector": 167774207,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 83751862272,
+        "free_bytes": 2147483648,
+        "files": [
+          "/Windows/System32/mock.bin",
+          "/Users/LabUser/fill-c-01.dat"
+        ]
+      },
+      {
+        "number": 2,
+        "label": "E",
+        "name": "E",
+        "type": "msftdata",
+        "start_sector": 167774208,
+        "end_sector": 629147647,
+        "filesystem": "ntfs",
+        "mountpoint": null,
+        "used_bytes": 85899345920,
+        "free_bytes": 150323855360,
+        "files": [
+          "/data/projects/archive-001.bin",
+          "/data/projects/archive-002.bin",
+          "/data/checksums/manifest.sha256"
+        ]
+      }
+    ],
+    "free_regions": [
+      {
+        "start_sector": 629147648,
+        "end_sector": 671088606,
+        "size_bytes": 21473771008
+      }
+    ]
+  }
+}

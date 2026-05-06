@@ -5,7 +5,7 @@ use tauri::{
     Manager, Runtime,
 };
 
-const APP_NAME: &str = "tenra Partition Studio";
+const APP_NAME: &str = "tenra Partition";
 const MENU_SETTINGS: &str = "settings";
 const MENU_CLOSE_WINDOW: &str = "close-window";
 const MENU_QUIT: &str = "quit";
@@ -19,7 +19,7 @@ fn execution_status() -> domain::ExecutionStatus {
 fn supported_scanner_adapters() -> Vec<domain::ScannerAdapterStatus> {
     vec![
         domain::ScannerAdapterStatus::mock_json(),
-        domain::ScannerAdapterStatus::future("tenra Partition Lab JSON import"),
+        domain::ScannerAdapterStatus::future("Integrated lab JSON import"),
         domain::ScannerAdapterStatus::future("Windows PowerShell Storage module"),
         domain::ScannerAdapterStatus::future("Linux lsblk/parted/sgdisk"),
         domain::ScannerAdapterStatus::future("macOS diskutil"),
@@ -54,7 +54,7 @@ pub fn run() {
             supported_scanner_adapters
         ])
         .build(tauri::generate_context!())
-        .expect("error while building tenra Partition Studio");
+        .expect("error while building tenra Partition");
 
     app.run(|app_handle, event| match event {
         #[cfg(target_os = "macos")]
