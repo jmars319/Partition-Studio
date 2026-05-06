@@ -535,6 +535,20 @@ button:disabled {
   color: #475569;
 }
 
+.lab-actions {
+  border-top: 1px solid #dbeafe;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+}
+
+.lab-actions button {
+  justify-content: flex-start;
+  min-width: 0;
+}
+
 .finding {
   border-left: 3px solid #94a3b8;
   padding-left: 0.65rem;

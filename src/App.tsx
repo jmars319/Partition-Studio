@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  Clipboard,
   Download,
   FileJson,
   FileText,
@@ -40,11 +41,37 @@ const EXECUTION_DISABLED_REASON =
 
 type ExportFormat = "plan-json" | "report-json" | "summary";
 
+type LabCommand = {
+  id: string;
+  label: string;
+  command: string;
+};
+
+const labCommands: LabCommand[] = [
+  {
+    id: "smoke",
+    label: "POSIX smoke",
+    command: "npm run lab:smoke:posix",
+  },
+  {
+    id: "plan",
+    label: "Fixture plan",
+    command:
+      "cd lab && scripts/plan_operation.py --layout fixtures/normal-c-e-layout.json --increase-c 40G",
+  },
+  {
+    id: "ui",
+    label: "Lab UI",
+    command: "cd lab && scripts/start_ui.sh --open",
+  },
+];
+
 function App() {
   const [disk, setDisk] = useState<Disk>(() => cloneDisk(fixtureDisk));
   const [labMetadata, setLabMetadata] = useState<PartitionLabMetadata>(() => fixtureLabMetadata);
   const [desiredGiB, setDesiredGiB] = useState(64);
   const [importError, setImportError] = useState("");
+  const [copiedCommandId, setCopiedCommandId] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const plan = useMemo(
@@ -109,6 +136,38 @@ function App() {
     }
 
     downloadFile(`${filenameBase}.txt`, createHumanReadableSummary(plan), "text/plain");
+  }
+
+  async function copyLabCommand(command: LabCommand) {
+    await navigator.clipboard.writeText(command.command);
+    setCopiedCommandId(command.id);
+    window.setTimeout(() => setCopiedCommandId(""), 1800);
+  }
+
+  function exportLabRequest() {
+    downloadFile(
+      `${plan.id}-lab-validation-request.json`,
+      JSON.stringify(
+        {
+          schema: "tenra-partition.lab-validation-request.v1",
+          exportedAt: new Date().toISOString(),
+          source: labMetadata,
+          requestedExpansionBytes: plan.requestedExpansionBytes,
+          plan,
+          simulation: {
+            ok: simulation.ok,
+            validation: simulation.validation,
+          },
+          execution: {
+            enabled: false,
+            reason: EXECUTION_DISABLED_REASON,
+          },
+        },
+        null,
+        2,
+      ),
+      "application/json",
+    );
   }
 
   return (
@@ -273,6 +332,10 @@ function App() {
               metadata={labMetadata}
               planStatus={plan.status}
               simulationOk={simulation.ok}
+              commands={labCommands}
+              copiedCommandId={copiedCommandId}
+              onCopyCommand={copyLabCommand}
+              onExportLabRequest={exportLabRequest}
             />
 
             <button className="execute-button" type="button" disabled>
@@ -309,10 +372,18 @@ function LabStatusPanel({
   metadata,
   planStatus,
   simulationOk,
+  commands,
+  copiedCommandId,
+  onCopyCommand,
+  onExportLabRequest,
 }: {
   metadata: PartitionLabMetadata;
   planStatus: string;
   simulationOk: boolean;
+  commands: LabCommand[];
+  copiedCommandId: string;
+  onCopyCommand: (command: LabCommand) => void;
+  onExportLabRequest: () => void;
 }) {
   const stages = [
     {
@@ -370,6 +441,22 @@ function LabStatusPanel({
           </li>
         ))}
       </ol>
+      <div className="lab-actions">
+        <button type="button" onClick={onExportLabRequest}>
+          <Download size={16} />
+          Lab request
+        </button>
+        {commands.map((command) => (
+          <button
+            key={command.id}
+            type="button"
+            onClick={() => onCopyCommand(command)}
+          >
+            <Clipboard size={16} />
+            {copiedCommandId === command.id ? "Copied" : command.label}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
