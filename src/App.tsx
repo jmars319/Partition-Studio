@@ -470,6 +470,12 @@ function LabStatusPanel({
         <div className="lab-request-summary">
           <span>Imported request</span>
           <strong>{formatBytes(labValidationRequest.requestedExpansionBytes)} requested</strong>
+          <p>
+            {labValidationRequest.source.schema} · {labValidationRequest.plan.operations.length} operation(s) · safety{" "}
+            {labValidationRequest.plan.safetyReport.level}
+          </p>
+          <p>{labValidationRequest.plan.validation.summary}</p>
+          <p>{labValidationRequest.simulation.validation.summary}</p>
           <p>{labValidationRequest.execution.reason}</p>
         </div>
       ) : null}

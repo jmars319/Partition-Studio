@@ -26,6 +26,15 @@ for (const file of files) {
   if (payload.execution?.enabled !== false) {
     throw new Error(`${file} must keep execution.enabled false.`);
   }
+  if (!Array.isArray(payload.plan?.operations) || payload.plan.operations.length === 0) {
+    throw new Error(`${file} must include a full operation plan with operations.`);
+  }
+  if (payload.plan?.validation?.ok !== true || payload.simulation?.validation?.ok !== true) {
+    throw new Error(`${file} must include passing plan and simulation validation summaries.`);
+  }
+  if (payload.plan?.safetyReport?.level !== "clear") {
+    throw new Error(`${file} must keep the golden fixture safety posture clear.`);
+  }
 }
 
 console.log(`Validated ${files.length} Partition handoff fixture(s).`);
