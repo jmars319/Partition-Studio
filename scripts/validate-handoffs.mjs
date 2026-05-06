@@ -7,7 +7,10 @@ const registryDocCheck = spawnSync(process.execPath, ["scripts/generate-handoff-
   stdio: "inherit"
 });
 if (registryDocCheck.status !== 0) process.exit(registryDocCheck.status ?? 1);
-const expectedSchemas = new Set(["tenra-partition.lab-validation-request.v1"]);
+const expectedSchemas = new Set([
+  "tenra-partition.lab-validation-request.v1",
+  "tenra-partition.lab-validation-result.v1"
+]);
 
 function listJsonFiles(dir) {
   if (!fs.existsSync(dir)) return [];
@@ -28,17 +31,30 @@ for (const file of files) {
   if (!expectedSchemas.has(payload.schema)) {
     throw new Error(`${file} uses an unexpected schema: ${payload.schema}`);
   }
-  if (payload.execution?.enabled !== false) {
-    throw new Error(`${file} must keep execution.enabled false.`);
+  if (payload.schema === "tenra-partition.lab-validation-request.v1") {
+    if (payload.execution?.enabled !== false) {
+      throw new Error(`${file} must keep execution.enabled false.`);
+    }
+    if (!Array.isArray(payload.plan?.operations) || payload.plan.operations.length === 0) {
+      throw new Error(`${file} must include a full operation plan with operations.`);
+    }
+    if (payload.plan?.validation?.ok !== true || payload.simulation?.validation?.ok !== true) {
+      throw new Error(`${file} must include passing plan and simulation validation summaries.`);
+    }
+    if (payload.plan?.safetyReport?.level !== "clear") {
+      throw new Error(`${file} must keep the golden fixture safety posture clear.`);
+    }
   }
-  if (!Array.isArray(payload.plan?.operations) || payload.plan.operations.length === 0) {
-    throw new Error(`${file} must include a full operation plan with operations.`);
-  }
-  if (payload.plan?.validation?.ok !== true || payload.simulation?.validation?.ok !== true) {
-    throw new Error(`${file} must include passing plan and simulation validation summaries.`);
-  }
-  if (payload.plan?.safetyReport?.level !== "clear") {
-    throw new Error(`${file} must keep the golden fixture safety posture clear.`);
+  if (payload.schema === "tenra-partition.lab-validation-result.v1") {
+    if (payload.sourceRequest?.schema !== "tenra-partition.lab-validation-request.v1") {
+      throw new Error(`${file} must embed the source lab validation request.`);
+    }
+    if (payload.review?.execution?.enabled !== false) {
+      throw new Error(`${file} must keep result review execution disabled.`);
+    }
+    if (payload.review?.requestedPlanMatchesReviewedPlan !== true) {
+      throw new Error(`${file} must preserve a matching reviewed plan in the golden result.`);
+    }
   }
 }
 

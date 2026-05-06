@@ -16,11 +16,14 @@ import "./App.css";
 import labFixture from "../fixtures/partition-lab-ce-layout.json";
 import {
   createLabValidationResult,
+  createGuardrailReviewFromLabResult,
   createHumanReadableSummary,
   loadDiskFromPartitionLabExport,
+  loadLabValidationResult,
   loadLabValidationRequest,
   readPartitionLabMetadata,
   type PartitionLabValidationRequest,
+  type PartitionLabValidationResult,
   type PartitionLabMetadata,
 } from "./io/partitionLab";
 import { planGiveSpaceToTarget } from "./planner/giveSpacePlanner";
@@ -77,8 +80,11 @@ function App() {
   const [copiedCommandId, setCopiedCommandId] = useState("");
   const [labValidationRequest, setLabValidationRequest] =
     useState<PartitionLabValidationRequest | null>(null);
+  const [labValidationResult, setLabValidationResult] =
+    useState<PartitionLabValidationResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const labRequestInputRef = useRef<HTMLInputElement | null>(null);
+  const labResultInputRef = useRef<HTMLInputElement | null>(null);
 
   const plan = useMemo(
     () =>
@@ -127,6 +133,23 @@ function App() {
         error instanceof Error ? error.message : "Unknown lab request import error.";
       setImportError(message);
       setLabValidationRequest(null);
+    } finally {
+      event.currentTarget.value = "";
+    }
+  }
+
+  async function handleLabResultImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+
+    try {
+      setLabValidationResult(loadLabValidationResult(JSON.parse(await file.text())));
+      setImportError("");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown lab result import error.";
+      setImportError(message);
+      setLabValidationResult(null);
     } finally {
       event.currentTarget.value = "";
     }
@@ -210,6 +233,27 @@ function App() {
     );
   }
 
+  function exportGuardrailReview() {
+    const result =
+      labValidationResult ??
+      (labValidationRequest
+        ? createLabValidationResult({
+            sourceRequest: labValidationRequest,
+            reviewedPlan: plan,
+            simulation,
+            executionDisabledReason: EXECUTION_DISABLED_REASON,
+          })
+        : null);
+
+    if (!result) return;
+
+    downloadFile(
+      `${plan.id}-guardrail-review.json`,
+      JSON.stringify(createGuardrailReviewFromLabResult({ result }), null, 2),
+      "application/json",
+    );
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -254,6 +298,13 @@ function App() {
             accept="application/json,.json"
             onChange={handleLabRequestImport}
           />
+          <input
+            ref={labResultInputRef}
+            className="visually-hidden"
+            type="file"
+            accept="application/json,.json"
+            onChange={handleLabResultImport}
+          />
           <div className="button-grid">
             <button type="button" onClick={() => fileInputRef.current?.click()}>
               <Upload size={16} />
@@ -262,6 +313,10 @@ function App() {
             <button type="button" onClick={() => labRequestInputRef.current?.click()}>
               <FileJson size={16} />
               Lab request
+            </button>
+            <button type="button" onClick={() => labResultInputRef.current?.click()}>
+              <FileJson size={16} />
+              Lab result
             </button>
             <button type="button" onClick={resetFixture}>
               <FileJson size={16} />
@@ -382,6 +437,7 @@ function App() {
             <LabStatusPanel
               metadata={labMetadata}
               labValidationRequest={labValidationRequest}
+              labValidationResult={labValidationResult}
               planStatus={plan.status}
               simulationOk={simulation.ok}
               commands={labCommands}
@@ -389,6 +445,7 @@ function App() {
               onCopyCommand={copyLabCommand}
               onExportLabRequest={exportLabRequest}
               onExportLabResult={exportLabResult}
+              onExportGuardrailReview={exportGuardrailReview}
             />
 
             <button className="execute-button" type="button" disabled>
@@ -424,6 +481,7 @@ function App() {
 function LabStatusPanel({
   metadata,
   labValidationRequest,
+  labValidationResult,
   planStatus,
   simulationOk,
   commands,
@@ -431,9 +489,11 @@ function LabStatusPanel({
   onCopyCommand,
   onExportLabRequest,
   onExportLabResult,
+  onExportGuardrailReview,
 }: {
   metadata: PartitionLabMetadata;
   labValidationRequest: PartitionLabValidationRequest | null;
+  labValidationResult: PartitionLabValidationResult | null;
   planStatus: string;
   simulationOk: boolean;
   commands: LabCommand[];
@@ -441,6 +501,7 @@ function LabStatusPanel({
   onCopyCommand: (command: LabCommand) => void;
   onExportLabRequest: () => void;
   onExportLabResult: () => void;
+  onExportGuardrailReview: () => void;
 }) {
   const labDifferences = labValidationRequest
     ? [
@@ -536,6 +597,25 @@ function LabStatusPanel({
           )}
         </div>
       ) : null}
+      {labValidationResult ? (
+        <div className="lab-request-summary">
+          <span>Imported result</span>
+          <strong>{labValidationResult.review.status}</strong>
+          <p>
+            {labValidationResult.sourceRequest.plan.id} · safety {labValidationResult.review.safetyPosture} · simulation{" "}
+            {labValidationResult.simulation.ok ? "passed" : "blocked"}
+          </p>
+          {labValidationResult.review.differences.length ? (
+            <ul>
+              {labValidationResult.review.differences.map((difference) => (
+                <li key={difference}>{difference}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No differences were reported by the lab result.</p>
+          )}
+        </div>
+      ) : null}
       <ol className="lab-stage-list">
         {stages.map((stage, index) => (
           <li className={`lab-stage lab-stage-${stage.status}`} key={stage.label}>
@@ -555,6 +635,14 @@ function LabStatusPanel({
         <button type="button" disabled={!labValidationRequest} onClick={onExportLabResult}>
           <Download size={16} />
           Lab result
+        </button>
+        <button
+          type="button"
+          disabled={!labValidationRequest && !labValidationResult}
+          onClick={onExportGuardrailReview}
+        >
+          <ShieldAlert size={16} />
+          Guardrail
         </button>
         {commands.map((command) => (
           <button

@@ -1,0 +1,401 @@
+{
+  "schema": "tenra-partition.lab-validation-result.v1",
+  "exportedAt": "2026-05-06T18:35:00.000Z",
+  "sourceRequest": {
+    "schema": "tenra-partition.lab-validation-request.v1",
+    "exportedAt": "2026-05-06T17:30:00.000Z",
+    "source": {
+      "schema": "partition-lab.disk-layout.v1",
+      "capturedAt": "2026-05-06T17:00:00.000Z",
+      "source": "fixture"
+    },
+    "requestedExpansionBytes": 68719476736,
+    "plan": {
+      "id": "plan-c-e-68719476736",
+      "workflow": "give-space-to-target",
+      "createdAt": "2026-05-06T17:25:00.000Z",
+      "status": "ready",
+      "disk": {
+        "id": "disk0",
+        "name": "Disk 0",
+        "sizeBytes": 536870912000,
+        "sectorSizeBytes": 512,
+        "alignmentBytes": 1048576,
+        "scheme": "GPT",
+        "partitions": [
+          {
+            "id": "part-esp",
+            "number": 1,
+            "name": "EFI System",
+            "startByte": 1048576,
+            "sizeBytes": 104857600,
+            "filesystem": {
+              "type": "ntfs",
+              "label": "ESP placeholder",
+              "totalBytes": 104857600,
+              "usedBytes": 41943040,
+              "minimumSizeBytes": 67108864
+            },
+            "mounted": false,
+            "encrypted": false,
+            "dirty": false,
+            "movable": false,
+            "resizable": false
+          },
+          {
+            "id": "part-c",
+            "number": 2,
+            "name": "Windows",
+            "letter": "C",
+            "startByte": 105906176,
+            "sizeBytes": 137438953472,
+            "filesystem": {
+              "type": "ntfs",
+              "label": "Windows",
+              "totalBytes": 137438953472,
+              "usedBytes": 124554051584,
+              "minimumSizeBytes": 129922760704
+            },
+            "mounted": false,
+            "encrypted": false,
+            "dirty": false,
+            "movable": false,
+            "resizable": true
+          },
+          {
+            "id": "part-e",
+            "number": 3,
+            "name": "Data",
+            "letter": "E",
+            "startByte": 137544859648,
+            "sizeBytes": 365072220160,
+            "filesystem": {
+              "type": "ntfs",
+              "label": "Data",
+              "totalBytes": 365072220160,
+              "usedBytes": 77309411328,
+              "minimumSizeBytes": 103079215104
+            },
+            "mounted": false,
+            "encrypted": false,
+            "dirty": false,
+            "movable": true,
+            "resizable": true
+          }
+        ]
+      },
+      "sourcePartitionId": "part-e",
+      "targetPartitionId": "part-c",
+      "requestedExpansionBytes": 68719476736,
+      "requiresMovement": true,
+      "explanation": "Shrink and move E: to create adjacent free space after C:, then expand C: into it.",
+      "operations": [
+        {
+          "id": "shrink-source-filesystem",
+          "type": "shrink-filesystem",
+          "title": "Shrink E: filesystem",
+          "description": "Reduce the NTFS filesystem on E: by 64 GiB while preserving used data constraints.",
+          "partitionId": "part-e",
+          "amountBytes": 68719476736,
+          "resultingFilesystemBytes": 296352743424
+        },
+        {
+          "id": "shrink-source-partition",
+          "type": "shrink-partition",
+          "title": "Shrink E: partition",
+          "description": "Reduce the partition boundary on E: to match the smaller filesystem.",
+          "partitionId": "part-e",
+          "amountBytes": 68719476736,
+          "resultingSizeBytes": 296352743424
+        },
+        {
+          "id": "move-source-right",
+          "type": "move-partition",
+          "title": "Move E: to the right",
+          "description": "Move E: right by 64 GiB so the free space becomes adjacent to C:.",
+          "partitionId": "part-e",
+          "amountBytes": 68719476736,
+          "resultingStartByte": 206264336384
+        },
+        {
+          "id": "create-target-adjacent-free-space",
+          "type": "create-adjacent-free-space",
+          "title": "Create free space after C:",
+          "description": "The move leaves 64 GiB of unallocated space immediately after C:.",
+          "amountBytes": 68719476736
+        },
+        {
+          "id": "expand-target-partition",
+          "type": "expand-partition",
+          "title": "Expand C: partition",
+          "description": "Extend C: into the adjacent free space.",
+          "partitionId": "part-c",
+          "amountBytes": 68719476736,
+          "resultingSizeBytes": 206158430208
+        },
+        {
+          "id": "expand-target-filesystem",
+          "type": "expand-filesystem",
+          "title": "Expand C: filesystem",
+          "description": "Grow the NTFS filesystem on C: to fill the expanded partition.",
+          "partitionId": "part-c",
+          "amountBytes": 68719476736,
+          "resultingFilesystemBytes": 206158430208
+        }
+      ],
+      "safetyReport": {
+        "level": "clear",
+        "findings": []
+      },
+      "validation": {
+        "ok": true,
+        "summary": "Plan is ready for disposable-image validation.",
+        "errors": [],
+        "warnings": []
+      }
+    },
+    "simulation": {
+      "ok": true,
+      "validation": {
+        "ok": true,
+        "summary": "Fixture validates the handoff shape.",
+        "findings": []
+      }
+    },
+    "execution": {
+      "enabled": false,
+      "reason": "Execution is disabled for handoff validation fixtures."
+    }
+  },
+  "reviewedPlan": {
+    "id": "plan-c-e-68719476736",
+    "workflow": "give-space-to-target",
+    "createdAt": "2026-05-06T17:25:00.000Z",
+    "status": "ready",
+    "disk": {
+      "id": "disk0",
+      "name": "Disk 0",
+      "sizeBytes": 536870912000,
+      "sectorSizeBytes": 512,
+      "alignmentBytes": 1048576,
+      "scheme": "GPT",
+      "partitions": [
+        {
+          "id": "part-esp",
+          "number": 1,
+          "name": "EFI System",
+          "startByte": 1048576,
+          "sizeBytes": 104857600,
+          "filesystem": {
+            "type": "ntfs",
+            "label": "ESP placeholder",
+            "totalBytes": 104857600,
+            "usedBytes": 41943040,
+            "minimumSizeBytes": 67108864
+          },
+          "mounted": false,
+          "encrypted": false,
+          "dirty": false,
+          "movable": false,
+          "resizable": false
+        },
+        {
+          "id": "part-c",
+          "number": 2,
+          "name": "Windows",
+          "letter": "C",
+          "startByte": 105906176,
+          "sizeBytes": 137438953472,
+          "filesystem": {
+            "type": "ntfs",
+            "label": "Windows",
+            "totalBytes": 137438953472,
+            "usedBytes": 124554051584,
+            "minimumSizeBytes": 129922760704
+          },
+          "mounted": false,
+          "encrypted": false,
+          "dirty": false,
+          "movable": false,
+          "resizable": true
+        },
+        {
+          "id": "part-e",
+          "number": 3,
+          "name": "Data",
+          "letter": "E",
+          "startByte": 137544859648,
+          "sizeBytes": 365072220160,
+          "filesystem": {
+            "type": "ntfs",
+            "label": "Data",
+            "totalBytes": 365072220160,
+            "usedBytes": 77309411328,
+            "minimumSizeBytes": 103079215104
+          },
+          "mounted": false,
+          "encrypted": false,
+          "dirty": false,
+          "movable": true,
+          "resizable": true
+        }
+      ]
+    },
+    "sourcePartitionId": "part-e",
+    "targetPartitionId": "part-c",
+    "requestedExpansionBytes": 68719476736,
+    "requiresMovement": true,
+    "explanation": "Shrink and move E: to create adjacent free space after C:, then expand C: into it.",
+    "operations": [
+      {
+        "id": "shrink-source-filesystem",
+        "type": "shrink-filesystem",
+        "title": "Shrink E: filesystem",
+        "description": "Reduce the NTFS filesystem on E: by 64 GiB while preserving used data constraints.",
+        "partitionId": "part-e",
+        "amountBytes": 68719476736,
+        "resultingFilesystemBytes": 296352743424
+      },
+      {
+        "id": "shrink-source-partition",
+        "type": "shrink-partition",
+        "title": "Shrink E: partition",
+        "description": "Reduce the partition boundary on E: to match the smaller filesystem.",
+        "partitionId": "part-e",
+        "amountBytes": 68719476736,
+        "resultingSizeBytes": 296352743424
+      },
+      {
+        "id": "move-source-right",
+        "type": "move-partition",
+        "title": "Move E: to the right",
+        "description": "Move E: right by 64 GiB so the free space becomes adjacent to C:.",
+        "partitionId": "part-e",
+        "amountBytes": 68719476736,
+        "resultingStartByte": 206264336384
+      },
+      {
+        "id": "create-target-adjacent-free-space",
+        "type": "create-adjacent-free-space",
+        "title": "Create free space after C:",
+        "description": "The move leaves 64 GiB of unallocated space immediately after C:.",
+        "amountBytes": 68719476736
+      },
+      {
+        "id": "expand-target-partition",
+        "type": "expand-partition",
+        "title": "Expand C: partition",
+        "description": "Extend C: into the adjacent free space.",
+        "partitionId": "part-c",
+        "amountBytes": 68719476736,
+        "resultingSizeBytes": 206158430208
+      },
+      {
+        "id": "expand-target-filesystem",
+        "type": "expand-filesystem",
+        "title": "Expand C: filesystem",
+        "description": "Grow the NTFS filesystem on C: to fill the expanded partition.",
+        "partitionId": "part-c",
+        "amountBytes": 68719476736,
+        "resultingFilesystemBytes": 206158430208
+      }
+    ],
+    "safetyReport": {
+      "level": "clear",
+      "findings": []
+    },
+    "validation": {
+      "ok": true,
+      "summary": "Plan is ready for disposable-image validation.",
+      "errors": [],
+      "warnings": []
+    }
+  },
+  "simulation": {
+    "ok": true,
+    "validation": {
+      "ok": true,
+      "summary": "Fixture validates the handoff shape.",
+      "findings": []
+    },
+    "disk": {
+      "id": "disk0",
+      "name": "Disk 0",
+      "sizeBytes": 536870912000,
+      "sectorSizeBytes": 512,
+      "alignmentBytes": 1048576,
+      "scheme": "GPT",
+      "partitions": [
+        {
+          "id": "part-esp",
+          "number": 1,
+          "name": "EFI System",
+          "startByte": 1048576,
+          "sizeBytes": 104857600,
+          "filesystem": {
+            "type": "ntfs",
+            "label": "ESP placeholder",
+            "totalBytes": 104857600,
+            "usedBytes": 41943040,
+            "minimumSizeBytes": 67108864
+          },
+          "mounted": false,
+          "encrypted": false,
+          "dirty": false,
+          "movable": false,
+          "resizable": false
+        },
+        {
+          "id": "part-c",
+          "number": 2,
+          "name": "Windows",
+          "letter": "C",
+          "startByte": 105906176,
+          "sizeBytes": 137438953472,
+          "filesystem": {
+            "type": "ntfs",
+            "label": "Windows",
+            "totalBytes": 137438953472,
+            "usedBytes": 124554051584,
+            "minimumSizeBytes": 129922760704
+          },
+          "mounted": false,
+          "encrypted": false,
+          "dirty": false,
+          "movable": false,
+          "resizable": true
+        },
+        {
+          "id": "part-e",
+          "number": 3,
+          "name": "Data",
+          "letter": "E",
+          "startByte": 137544859648,
+          "sizeBytes": 365072220160,
+          "filesystem": {
+            "type": "ntfs",
+            "label": "Data",
+            "totalBytes": 365072220160,
+            "usedBytes": 77309411328,
+            "minimumSizeBytes": 103079215104
+          },
+          "mounted": false,
+          "encrypted": false,
+          "dirty": false,
+          "movable": true,
+          "resizable": true
+        }
+      ]
+    }
+  },
+  "review": {
+    "status": "reviewed",
+    "requestedPlanMatchesReviewedPlan": true,
+    "safetyPosture": "clear",
+    "differences": [],
+    "execution": {
+      "enabled": false,
+      "reason": "Execution is disabled for handoff validation fixtures."
+    }
+  }
+}

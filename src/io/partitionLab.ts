@@ -107,6 +107,16 @@ export function loadLabValidationRequest(input: unknown): PartitionLabValidation
   return input;
 }
 
+export function loadLabValidationResult(input: unknown): PartitionLabValidationResult {
+  if (!isPartitionLabValidationResult(input)) {
+    throw new Error(
+      "Expected tenra Partition lab validation result JSON with schema tenra-partition.lab-validation-result.v1.",
+    );
+  }
+
+  return input;
+}
+
 export function createLabValidationResult(input: {
   sourceRequest: PartitionLabValidationRequest;
   reviewedPlan: OperationPlan;
@@ -141,6 +151,36 @@ export function createLabValidationResult(input: {
         reason: input.executionDisabledReason,
       },
     },
+  };
+}
+
+export function createGuardrailReviewFromLabResult(input: {
+  result: PartitionLabValidationResult;
+}) {
+  const { result } = input;
+
+  return {
+    schema: "tenra-guardrail.external-action-review.v1",
+    exportedAt: new Date().toISOString(),
+    sourceApp: "partition",
+    actionKind: "execute-system-change",
+    actorLabel: "Partition lab validation",
+    targetLabel: result.sourceRequest.plan.id,
+    summary:
+      result.review.status === "blocked"
+        ? "Partition lab validation blocked a disk operation. Execution must remain disabled until Guardrail and a human operator review it."
+        : "Partition lab validation reviewed a disk operation. Execution remains disabled in the local app.",
+    evidence: [
+      { label: "Review status", value: result.review.status },
+      { label: "Safety posture", value: result.review.safetyPosture },
+      { label: "Simulation", value: result.simulation.ok ? "passed" : "blocked" },
+      {
+        label: "Differences",
+        value: result.review.differences.length ? result.review.differences.join("; ") : "none",
+      },
+    ],
+    recommendedDecision: result.review.status === "blocked" ? "deny" : "review",
+    traceId: `partition-lab-${result.sourceRequest.plan.id}`,
   };
 }
 
@@ -211,6 +251,19 @@ function isPartitionLabDiskLayout(input: unknown): input is PartitionLabDiskLayo
     typeof candidate.capturedAt === "string" &&
     typeof candidate.source === "string" &&
     isDisk(candidate.disk)
+  );
+}
+
+function isPartitionLabValidationResult(input: unknown): input is PartitionLabValidationResult {
+  if (!input || typeof input !== "object") return false;
+  const candidate = input as Partial<PartitionLabValidationResult>;
+  return (
+    candidate.schema === "tenra-partition.lab-validation-result.v1" &&
+    typeof candidate.exportedAt === "string" &&
+    Boolean(candidate.sourceRequest) &&
+    Boolean(candidate.reviewedPlan) &&
+    Boolean(candidate.simulation) &&
+    Boolean(candidate.review)
   );
 }
 

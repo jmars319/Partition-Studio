@@ -1,6 +1,6 @@
 # Suite Handoff Registry
 
-Generated from the suite handoff contract inventory by `scripts/generate-handoff-registry.mjs`.
+Generated from `@tenra-handoff` source annotations by `scripts/generate-handoff-registry.mjs`.
 
 This repository participates in tenra-suite local handoffs. Handoffs are explicit JSON payloads moved through local UI actions, API routes, exports, imports, or fixtures. Apps should not read another app's private storage directly.
 

@@ -16,6 +16,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Check suite handoff contract conformance
+        run: node scripts/generate-handoff-registry.mjs --check
       - name: Validate handoff fixtures
         run: npm run verify:handoffs
       - name: Run app validation
