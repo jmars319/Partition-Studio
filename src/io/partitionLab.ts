@@ -53,6 +53,20 @@ export interface PartitionLabValidationResult {
   };
 }
 
+export interface PartitionGuardrailDecision {
+  schema: "tenra-guardrail.external-action-decision.v1";
+  decidedAt: string;
+  requestTraceId: string;
+  decision: "allow" | "review" | "deny";
+  reason: string;
+  sourceReturn?: {
+    app?: string;
+    traceId?: string;
+    expectedSchema?: string;
+    action?: string;
+  };
+}
+
 export function loadDiskFromPartitionLabExport(input: unknown): Disk {
   if (!isPartitionLabDiskLayout(input)) {
     throw new Error("Expected tenra Partition lab disk layout JSON with schema partition-lab.disk-layout.v1.");
@@ -112,6 +126,14 @@ export function loadLabValidationResult(input: unknown): PartitionLabValidationR
     throw new Error(
       "Expected tenra Partition lab validation result JSON with schema tenra-partition.lab-validation-result.v1.",
     );
+  }
+
+  return input;
+}
+
+export function loadPartitionGuardrailDecision(input: unknown): PartitionGuardrailDecision {
+  if (!isPartitionGuardrailDecision(input)) {
+    throw new Error("Expected Guardrail decision JSON returnable to tenra Partition.");
   }
 
   return input;
@@ -264,6 +286,20 @@ function isPartitionLabValidationResult(input: unknown): input is PartitionLabVa
     Boolean(candidate.reviewedPlan) &&
     Boolean(candidate.simulation) &&
     Boolean(candidate.review)
+  );
+}
+
+function isPartitionGuardrailDecision(input: unknown): input is PartitionGuardrailDecision {
+  if (!input || typeof input !== "object") return false;
+  const candidate = input as Partial<PartitionGuardrailDecision>;
+  return (
+    candidate.schema === "tenra-guardrail.external-action-decision.v1" &&
+    typeof candidate.decidedAt === "string" &&
+    typeof candidate.requestTraceId === "string" &&
+    (candidate.decision === "allow" || candidate.decision === "review" || candidate.decision === "deny") &&
+    typeof candidate.reason === "string" &&
+    candidate.sourceReturn?.app === "partition" &&
+    candidate.sourceReturn.action === "apply-guardrail-decision"
   );
 }
 

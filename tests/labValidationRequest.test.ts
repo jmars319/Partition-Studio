@@ -7,6 +7,7 @@ import {
   loadDiskFromPartitionLabExport,
   loadLabValidationRequest,
   loadLabValidationResult,
+  loadPartitionGuardrailDecision,
   readPartitionLabMetadata,
 } from "../src/io/partitionLab";
 import { planGiveSpaceToTarget } from "../src/planner/giveSpacePlanner";
@@ -94,5 +95,30 @@ describe("lab validation result handoffs", () => {
     expect(review.schema).toBe("tenra-guardrail.external-action-review.v1");
     expect(review.sourceApp).toBe("partition");
     expect(review.recommendedDecision).toBe("deny");
+  });
+
+  it("imports Guardrail allow and deny decisions for blocked lab reviews", () => {
+    const baseDecision = {
+      schema: "tenra-guardrail.external-action-decision.v1",
+      decidedAt: "2026-05-06T18:00:00.000Z",
+      requestTraceId: "partition-lab-plan-demo",
+      reason: "Reviewed by operator.",
+      sourceReturn: {
+        app: "partition",
+        traceId: "partition-lab-plan-demo",
+        expectedSchema: "tenra-partition.lab-validation-result.v1",
+        action: "apply-guardrail-decision",
+      },
+    };
+
+    expect(loadPartitionGuardrailDecision({ ...baseDecision, decision: "allow" }).decision).toBe("allow");
+    expect(loadPartitionGuardrailDecision({ ...baseDecision, decision: "deny" }).decision).toBe("deny");
+    expect(() =>
+      loadPartitionGuardrailDecision({
+        ...baseDecision,
+        decision: "allow",
+        sourceReturn: { ...baseDecision.sourceReturn, app: "align" },
+      }),
+    ).toThrow(/returnable to tenra Partition/);
   });
 });

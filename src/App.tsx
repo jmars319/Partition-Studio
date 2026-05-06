@@ -21,7 +21,9 @@ import {
   loadDiskFromPartitionLabExport,
   loadLabValidationResult,
   loadLabValidationRequest,
+  loadPartitionGuardrailDecision,
   readPartitionLabMetadata,
+  type PartitionGuardrailDecision,
   type PartitionLabValidationRequest,
   type PartitionLabValidationResult,
   type PartitionLabMetadata,
@@ -82,6 +84,8 @@ function App() {
     useState<PartitionLabValidationRequest | null>(null);
   const [labValidationResult, setLabValidationResult] =
     useState<PartitionLabValidationResult | null>(null);
+  const [guardrailDecisionJson, setGuardrailDecisionJson] = useState("");
+  const [guardrailDecision, setGuardrailDecision] = useState<PartitionGuardrailDecision | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const labRequestInputRef = useRef<HTMLInputElement | null>(null);
   const labResultInputRef = useRef<HTMLInputElement | null>(null);
@@ -252,6 +256,30 @@ function App() {
       JSON.stringify(createGuardrailReviewFromLabResult({ result }), null, 2),
       "application/json",
     );
+  }
+
+  function importGuardrailDecision() {
+    if (!guardrailDecisionJson.trim()) {
+      setImportError("Paste Guardrail decision JSON before importing.");
+      return;
+    }
+
+    try {
+      const decision = loadPartitionGuardrailDecision(JSON.parse(guardrailDecisionJson));
+      const expectedTraceId = labValidationResult
+        ? `partition-lab-${labValidationResult.sourceRequest.plan.id}`
+        : labValidationRequest
+          ? `partition-lab-${labValidationRequest.plan.id}`
+          : "";
+      if (expectedTraceId && decision.requestTraceId !== expectedTraceId) {
+        throw new Error("Guardrail decision does not match the current Partition lab review.");
+      }
+      setGuardrailDecision(decision);
+      setGuardrailDecisionJson("");
+      setImportError("");
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Guardrail decision import failed.");
+    }
   }
 
   return (
@@ -446,6 +474,10 @@ function App() {
               onExportLabRequest={exportLabRequest}
               onExportLabResult={exportLabResult}
               onExportGuardrailReview={exportGuardrailReview}
+              guardrailDecision={guardrailDecision}
+              guardrailDecisionJson={guardrailDecisionJson}
+              onGuardrailDecisionJsonChange={setGuardrailDecisionJson}
+              onImportGuardrailDecision={importGuardrailDecision}
             />
 
             <button className="execute-button" type="button" disabled>
@@ -486,14 +518,20 @@ function LabStatusPanel({
   simulationOk,
   commands,
   copiedCommandId,
+  guardrailDecision,
+  guardrailDecisionJson,
   onCopyCommand,
   onExportLabRequest,
   onExportLabResult,
   onExportGuardrailReview,
+  onGuardrailDecisionJsonChange,
+  onImportGuardrailDecision,
 }: {
   metadata: PartitionLabMetadata;
   labValidationRequest: PartitionLabValidationRequest | null;
   labValidationResult: PartitionLabValidationResult | null;
+  guardrailDecision: PartitionGuardrailDecision | null;
+  guardrailDecisionJson: string;
   planStatus: string;
   simulationOk: boolean;
   commands: LabCommand[];
@@ -502,6 +540,8 @@ function LabStatusPanel({
   onExportLabRequest: () => void;
   onExportLabResult: () => void;
   onExportGuardrailReview: () => void;
+  onGuardrailDecisionJsonChange: (value: string) => void;
+  onImportGuardrailDecision: () => void;
 }) {
   const labDifferences = labValidationRequest
     ? [
@@ -517,6 +557,14 @@ function LabStatusPanel({
       ].filter(Boolean)
     : [];
   const labResultBlocked = labValidationResult?.review.status === "blocked";
+  const guardrailResolution =
+    guardrailDecision?.decision === "allow"
+      ? "Guardrail allowed operator resolution. Execution remains locked until lab policy changes."
+      : guardrailDecision?.decision === "deny"
+        ? "Guardrail denied this operation. Keep the lab result blocked."
+        : guardrailDecision?.decision === "review"
+          ? "Guardrail requested another human review pass before this lab result can be resolved."
+          : "";
   const stages = [
     {
       label: "Layout imported",
@@ -622,6 +670,14 @@ function LabStatusPanel({
               <p>{labValidationResult.review.execution.reason}</p>
             </div>
           ) : null}
+          {guardrailDecision ? (
+            <div className={`blocked-next-action decision-${guardrailDecision.decision}`}>
+              <span>Guardrail decision</span>
+              <strong>{guardrailDecision.decision}</strong>
+              <p>{guardrailDecision.reason}</p>
+              <p>{guardrailResolution}</p>
+            </div>
+          ) : null}
         </div>
       ) : null}
       <ol className="lab-stage-list">
@@ -663,6 +719,20 @@ function LabStatusPanel({
             {copiedCommandId === command.id ? "Copied" : command.label}
           </button>
         ))}
+      </div>
+      <label className="guardrail-decision-import">
+        <span>Guardrail decision return</span>
+        <textarea
+          placeholder='{"schema":"tenra-guardrail.external-action-decision.v1","sourceReturn":{"app":"partition","action":"apply-guardrail-decision"},...}'
+          value={guardrailDecisionJson}
+          onChange={(event) => onGuardrailDecisionJsonChange(event.currentTarget.value)}
+        />
+      </label>
+      <div className="lab-actions">
+        <button type="button" onClick={onImportGuardrailDecision}>
+          <ShieldCheck size={16} />
+          Import decision
+        </button>
       </div>
     </section>
   );

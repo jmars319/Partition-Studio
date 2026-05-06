@@ -598,6 +598,44 @@ button:disabled {
   color: #7f1d1d;
 }
 
+.decision-allow {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.decision-allow span,
+.decision-allow strong {
+  color: #166534;
+}
+
+.decision-review {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.decision-review span,
+.decision-review strong {
+  color: #1d4ed8;
+}
+
+.guardrail-decision-import {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.guardrail-decision-import span {
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.guardrail-decision-import textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
 button.primary-next-action {
   border-color: #b91c1c;
   background: #fee2e2;
