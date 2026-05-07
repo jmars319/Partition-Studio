@@ -8,6 +8,10 @@ disk-layout simulation and lab validation app
 
 keep unique; Guardrail can review unsafe changes and Proxy can shape operator-facing explanations.
 
+## Standalone Mode
+
+Runs as a complete partition planning and lab validation app with local simulation, refusal checks, safety review, and result queues.
+
 ## Accepted Inputs
 
 - No accepted suite contract is registered yet.
