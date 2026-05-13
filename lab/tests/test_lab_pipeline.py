@@ -233,6 +233,27 @@ class RawImageNormalizationTests(unittest.TestCase):
         self.assertIn("ntfsresize", " ".join(command_plan["modes"]["real_ntfs"]["steps"][1]["command"]))
         self.assertIn("gparted_live_vm", command_plan["modes"])
 
+    def test_sgdisk_cross_check_passes_for_valid_gpt_and_blocks_mbr(self) -> None:
+        gpt_image = self.create_image("unittest-sgdisk-gpt")
+        gpt_result = self.run_script("gpt_cross_check.py", "--image", str(gpt_image), "--json")
+
+        self.assertEqual(gpt_result.returncode, 0, gpt_result.stderr)
+        gpt_check = json.loads(gpt_result.stdout)
+        self.assertEqual(gpt_check["schema"], "partition-lab.sgdisk-check.v1")
+        self.assertEqual(gpt_check["status"], "pass")
+        self.assertEqual(
+            [(part["number"], part["start_sector"], part["end_sector"]) for part in gpt_check["sgdisk"]["partitions"]],
+            [(part["number"], part["start_sector"], part["end_sector"]) for part in gpt_check["python"]["partitions"]],
+        )
+
+        mbr_image = self.create_image("unittest-sgdisk-mbr", partition_table="mbr")
+        mbr_result = self.run_script("gpt_cross_check.py", "--image", str(mbr_image), "--json")
+
+        self.assertEqual(mbr_result.returncode, 2, mbr_result.stderr)
+        mbr_check = json.loads(mbr_result.stdout)
+        self.assertEqual(mbr_check["status"], "blocked")
+        self.assertIn("sgdisk-invalid-gpt", {item["id"] for item in mbr_check["blockers"]})
+
     def test_command_plan_reports_stable_blockers_for_unsafe_scenarios(self) -> None:
         cases = {
             "mbr-layout": "partition-table-not-gpt",
