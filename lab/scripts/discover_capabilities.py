@@ -19,6 +19,7 @@ SCHEMA_CAPABILITIES = "partition-lab.capabilities.v1"
 TOOL_COMMANDS = {
     "parted": ["parted", "--version"],
     "sgdisk": ["sgdisk", "--version"],
+    "gdisk": ["gdisk", "-v"],
     "ntfsresize": ["ntfsresize", "--version"],
     "ntfsclone": ["ntfsclone", "--version"],
     "ntfs-3g": ["ntfs-3g", "--version"],
@@ -34,6 +35,8 @@ TOOL_COMMANDS = {
 
 REAL_NTFS_TOOLS = ("parted", "sgdisk", "ntfsresize", "ntfsclone", "ntfs-3g")
 VM_TOOLS = ("qemu-img", "qemu-system-x86_64")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+KNOWN_GPARTED_ISO_NAMES = ("gparted-live*.iso", "GParted-live*.iso")
 
 
 def command_version(command: list[str], timeout_seconds: float = 3.0) -> str | None:
@@ -51,7 +54,9 @@ def command_version(command: list[str], timeout_seconds: float = 3.0) -> str | N
     output = "\n".join(part.strip() for part in (completed.stdout, completed.stderr) if part.strip())
     if not output:
         return None
-    return output.splitlines()[0][:240]
+    lines = output.splitlines()
+    version_line = next((line for line in lines if "version" in line.lower()), lines[0])
+    return version_line[:240]
 
 
 def discover_tool(name: str, command: list[str]) -> dict[str, Any]:
@@ -65,6 +70,51 @@ def discover_tool(name: str, command: list[str]) -> dict[str, Any]:
     }
 
 
+def discover_gparted_iso() -> dict[str, Any]:
+    candidates: list[Path] = []
+    search_roots = [
+        PROJECT_ROOT,
+        PROJECT_ROOT.parent,
+        PROJECT_ROOT.parent.parent,
+    ]
+    for root in search_roots:
+        for pattern in KNOWN_GPARTED_ISO_NAMES:
+            candidates.extend(root.glob(pattern))
+
+    resolved_candidates = sorted({path.resolve(strict=False) for path in candidates})
+    selected = resolved_candidates[0] if resolved_candidates else None
+    return {
+        "available": selected is not None,
+        "path": str(selected) if selected else None,
+        "candidates": [str(path) for path in resolved_candidates],
+    }
+
+
+def discover_qemu_architecture(tools: dict[str, Any]) -> dict[str, Any]:
+    qemu = tools.get("qemu-system-x86_64", {})
+    if not qemu.get("available"):
+        return {
+            "available": False,
+            "emulator": "qemu-system-x86_64",
+            "host_machine": platform.machine(),
+            "guest_machine": "x86_64",
+            "notes": ["qemu-system-x86_64 is not installed."],
+        }
+    host_machine = platform.machine()
+    notes = []
+    if host_machine.lower() in {"arm64", "aarch64"}:
+        notes.append("Host is ARM64; the amd64 GParted Live ISO will run through emulation.")
+    else:
+        notes.append("Host architecture is compatible with x86_64 VM comparison.")
+    return {
+        "available": True,
+        "emulator": qemu.get("path"),
+        "host_machine": host_machine,
+        "guest_machine": "x86_64",
+        "notes": notes,
+    }
+
+
 def discover_capabilities() -> dict[str, Any]:
     tools = {name: discover_tool(name, command) for name, command in TOOL_COMMANDS.items()}
     platform_name = platform.system().lower()
@@ -72,6 +122,11 @@ def discover_capabilities() -> dict[str, Any]:
     checksum_available = tools["b3sum"]["available"] or tools["sha256sum"]["available"] or tools["shasum"]["available"]
     real_ntfs_missing = [name for name in REAL_NTFS_TOOLS if not tools[name]["available"]]
     vm_missing = [name for name in VM_TOOLS if not tools[name]["available"]]
+    gparted_iso = discover_gparted_iso()
+    qemu_architecture = discover_qemu_architecture(tools)
+    vm_blockers = list(vm_missing)
+    if not gparted_iso["available"]:
+        vm_blockers.append("gparted-live-iso")
 
     blockers: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
@@ -83,11 +138,18 @@ def discover_capabilities() -> dict[str, Any]:
                 "message": f"Real NTFS mutation is unavailable; missing: {', '.join(real_ntfs_missing)}.",
             }
         )
-    if vm_missing:
+    if vm_blockers:
         warnings.append(
             {
                 "id": "vm-tools-missing",
-                "message": f"GParted Live VM comparison is unavailable; missing: {', '.join(vm_missing)}.",
+                "message": f"GParted Live VM comparison is unavailable; missing: {', '.join(vm_blockers)}.",
+            }
+        )
+    elif platform.machine().lower() in {"arm64", "aarch64"}:
+        warnings.append(
+            {
+                "id": "vm-emulation-host",
+                "message": "GParted Live VM comparison is available but will run the amd64 ISO through emulation.",
             }
         )
     if not checksum_available:
@@ -135,9 +197,9 @@ def discover_capabilities() -> dict[str, Any]:
                 "notes": ["Requires native partition and NTFS tools; remains dry-run unless explicitly implemented."],
             },
             "gparted_live_vm": {
-                "available": not vm_missing,
-                "blockers": vm_missing,
-                "notes": ["Requires a VM runner and image conversion tooling."],
+                "available": not vm_blockers,
+                "blockers": vm_blockers,
+                "notes": ["Requires QEMU image tooling and a local GParted Live ISO."],
             },
             "windows_vhdx": {
                 "available": platform_name == "windows" and tools["diskpart"]["available"] and powershell_available,
@@ -154,6 +216,18 @@ def discover_capabilities() -> dict[str, Any]:
             },
         },
         "tools": tools,
+        "optional_validation": {
+            "gpt_cross_check": {
+                "available": tools["sgdisk"]["available"],
+                "blockers": [] if tools["sgdisk"]["available"] else ["sgdisk"],
+            },
+            "qemu_image": {
+                "available": tools["qemu-img"]["available"],
+                "blockers": [] if tools["qemu-img"]["available"] else ["qemu-img"],
+            },
+            "gparted_live_iso": gparted_iso,
+            "qemu_architecture": qemu_architecture,
+        },
         "blockers": blockers,
         "warnings": warnings,
     }
