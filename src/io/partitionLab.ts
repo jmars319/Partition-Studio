@@ -9,8 +9,46 @@ export interface PartitionLabDiskLayout {
   disk: Disk;
 }
 
+export interface PartitionLabGeometryLayout {
+  schema: "partition-lab.layout.v1";
+  scenario?: string;
+  mode?: string;
+  description?: string;
+  image?: {
+    path?: string;
+    image_id?: string;
+  };
+  disk: {
+    id?: string;
+    path?: string;
+    label: string;
+    sector_size: number;
+    alignment_sectors: number;
+    size_bytes: number;
+    partitions: PartitionLabGeometryPartition[];
+  };
+}
+
+interface PartitionLabGeometryPartition {
+  number: number;
+  label?: string;
+  name?: string;
+  type?: string;
+  start_sector: number;
+  end_sector: number;
+  filesystem?: string;
+  filesystem_state?: string;
+  mountpoint?: string | null;
+  encrypted?: boolean;
+  used_bytes?: number;
+  free_bytes?: number;
+  minimum_size_bytes?: number;
+  movable?: boolean;
+  resizable?: boolean;
+}
+
 export interface PartitionLabMetadata {
-  schema: PartitionLabDiskLayout["schema"];
+  schema: PartitionLabDiskLayout["schema"] | PartitionLabGeometryLayout["schema"];
   capturedAt: string;
   source: string;
 }
@@ -68,23 +106,37 @@ export interface PartitionGuardrailDecision {
 }
 
 export function loadDiskFromPartitionLabExport(input: unknown): Disk {
-  if (!isPartitionLabDiskLayout(input)) {
-    throw new Error("Expected tenra Partition lab disk layout JSON with schema partition-lab.disk-layout.v1.");
+  if (isPartitionLabDiskLayout(input)) {
+    return input.disk;
+  }
+  if (isPartitionLabGeometryLayout(input)) {
+    return diskFromGeometryLayout(input);
   }
 
-  return input.disk;
+  throw new Error(
+    "Expected tenra Partition lab disk layout JSON with schema partition-lab.disk-layout.v1 or partition-lab.layout.v1.",
+  );
 }
 
 export function readPartitionLabMetadata(input: unknown): PartitionLabMetadata {
-  if (!isPartitionLabDiskLayout(input)) {
-    throw new Error("Expected tenra Partition lab disk layout JSON with schema partition-lab.disk-layout.v1.");
+  if (isPartitionLabDiskLayout(input)) {
+    return {
+      schema: input.schema,
+      capturedAt: input.capturedAt,
+      source: input.source,
+    };
+  }
+  if (isPartitionLabGeometryLayout(input)) {
+    return {
+      schema: input.schema,
+      capturedAt: new Date().toISOString(),
+      source: input.image?.path ?? input.disk.path ?? `tenra Partition Lab ${input.scenario ?? "layout"}`,
+    };
   }
 
-  return {
-    schema: input.schema,
-    capturedAt: input.capturedAt,
-    source: input.source,
-  };
+  throw new Error(
+    "Expected tenra Partition lab disk layout JSON with schema partition-lab.disk-layout.v1 or partition-lab.layout.v1.",
+  );
 }
 
 export function exportOperationPlan(plan: OperationPlan): string {
@@ -276,6 +328,73 @@ function isPartitionLabDiskLayout(input: unknown): input is PartitionLabDiskLayo
   );
 }
 
+function isPartitionLabGeometryLayout(input: unknown): input is PartitionLabGeometryLayout {
+  if (!input || typeof input !== "object") return false;
+  const candidate = input as Partial<PartitionLabGeometryLayout>;
+  return (
+    candidate.schema === "partition-lab.layout.v1" &&
+    Boolean(candidate.disk && typeof candidate.disk === "object") &&
+    typeof candidate.disk?.label === "string" &&
+    typeof candidate.disk.sector_size === "number" &&
+    typeof candidate.disk.alignment_sectors === "number" &&
+    typeof candidate.disk.size_bytes === "number" &&
+    Array.isArray(candidate.disk.partitions)
+  );
+}
+
+function diskFromGeometryLayout(layout: PartitionLabGeometryLayout): Disk {
+  const sectorSizeBytes = layout.disk.sector_size;
+  const alignmentBytes = layout.disk.alignment_sectors * sectorSizeBytes;
+  const scheme = layout.disk.label.toLowerCase() === "gpt" ? "GPT" : "MBR";
+  const id = layout.disk.id ?? layout.image?.image_id ?? layout.scenario ?? "lab-raw-image";
+
+  return {
+    id,
+    name: layout.scenario ?? layout.disk.path ?? "Lab raw image",
+    sizeBytes: layout.disk.size_bytes,
+    sectorSizeBytes,
+    alignmentBytes,
+    scheme,
+    partitions: layout.disk.partitions.map((partition) =>
+      partitionFromGeometryLayout(partition, sectorSizeBytes, alignmentBytes),
+    ),
+  };
+}
+
+function partitionFromGeometryLayout(
+  partition: PartitionLabGeometryPartition,
+  sectorSizeBytes: number,
+  alignmentBytes: number,
+) {
+  const label = partition.label ?? partition.name ?? `Partition ${partition.number}`;
+  const startByte = partition.start_sector * sectorSizeBytes;
+  const sizeBytes = (partition.end_sector - partition.start_sector + 1) * sectorSizeBytes;
+  const usedBytes = partition.used_bytes ?? Math.max(0, sizeBytes - (partition.free_bytes ?? 0));
+  const minimumSizeBytes =
+    partition.minimum_size_bytes ?? Math.min(sizeBytes, usedBytes + alignmentBytes);
+
+  return {
+    id: `lab-part-${partition.number}-${label.toLowerCase()}`,
+    number: partition.number,
+    name: partition.name ?? label,
+    letter: /^[A-Za-z]$/.test(label) ? label.toUpperCase() : undefined,
+    startByte,
+    sizeBytes,
+    filesystem: {
+      type: (partition.filesystem ?? "unknown").toLowerCase(),
+      label,
+      totalBytes: sizeBytes,
+      usedBytes,
+      minimumSizeBytes,
+    },
+    mounted: Boolean(partition.mountpoint),
+    encrypted: Boolean(partition.encrypted),
+    dirty: Boolean(partition.filesystem_state && partition.filesystem_state !== "clean"),
+    movable: partition.movable ?? label.toUpperCase() === "E",
+    resizable: partition.resizable ?? ["C", "E"].includes(label.toUpperCase()),
+  };
+}
+
 function isPartitionLabValidationResult(input: unknown): input is PartitionLabValidationResult {
   if (!input || typeof input !== "object") return false;
   const candidate = input as Partial<PartitionLabValidationResult>;
@@ -323,7 +442,8 @@ function isPartitionLabValidationRequest(input: unknown): input is PartitionLabV
   return (
     candidate.schema === "tenra-partition.lab-validation-request.v1" &&
     typeof candidate.exportedAt === "string" &&
-    candidate.source?.schema === "partition-lab.disk-layout.v1" &&
+    (candidate.source?.schema === "partition-lab.disk-layout.v1" ||
+      candidate.source?.schema === "partition-lab.layout.v1") &&
     typeof candidate.source.capturedAt === "string" &&
     typeof candidate.source.source === "string" &&
     typeof candidate.requestedExpansionBytes === "number" &&

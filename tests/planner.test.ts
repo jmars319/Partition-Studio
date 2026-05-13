@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import ceFixture from "../fixtures/partition-lab-ce-layout.json";
+import labLayoutFixture from "../lab/fixtures/normal-c-e-layout.json";
 import { gibToBytes } from "../src/domain/bytes";
-import { loadDiskFromPartitionLabExport } from "../src/io/partitionLab";
+import {
+  loadDiskFromPartitionLabExport,
+  readPartitionLabMetadata,
+} from "../src/io/partitionLab";
 import {
   getSourceShrinkCapacity,
   planGiveSpaceToTarget,
@@ -40,5 +44,21 @@ describe("planGiveSpaceToTarget", () => {
     });
 
     expect(getSourceShrinkCapacity(plan)).toBeGreaterThan(gibToBytes(200));
+  });
+
+  it("imports normalized lab layout JSON into the desktop planner model", () => {
+    const disk = loadDiskFromPartitionLabExport(labLayoutFixture);
+    const metadata = readPartitionLabMetadata(labLayoutFixture);
+    const plan = planGiveSpaceToTarget({
+      disk,
+      sourceLetter: "E",
+      targetLetter: "C",
+      expansionBytes: gibToBytes(40),
+    });
+
+    expect(metadata.schema).toBe("partition-lab.layout.v1");
+    expect(disk.scheme).toBe("GPT");
+    expect(disk.partitions.map((partition) => partition.letter)).toEqual(["C", "E"]);
+    expect(plan.status).toBe("ready");
   });
 });
