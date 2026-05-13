@@ -95,6 +95,19 @@ class RawImageNormalizationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return image
 
+    def create_preset_image(self, scenario: str) -> Path:
+        image = self.image_path(f"unittest-{scenario}")
+        result = self.run_script(
+            "create_image.py",
+            "--scenario",
+            scenario,
+            "--output",
+            str(image),
+            "--force",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return image
+
     def layout_for_image(self, image: Path) -> dict[str, object]:
         result = self.run_script("inspect_image.py", "--image", str(image), "--layout-json")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -134,6 +147,45 @@ class RawImageNormalizationTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing image manifest", result.stderr)
+
+    def test_scenario_presets_write_expected_manifest_state(self) -> None:
+        cases = {
+            "e-has-insufficient-free-space": ("E", "free_bytes"),
+            "dirty-filesystem-placeholder": ("E", "filesystem_state"),
+            "encrypted-filesystem-placeholder": ("E", "encrypted"),
+            "interrupted-operation-placeholder": ("disk", "operation_state"),
+            "non-adjacent-free-space": ("disk", "non_adjacent"),
+            "unaligned-layout": ("disk", "unaligned"),
+        }
+
+        for scenario, expectation in cases.items():
+            with self.subTest(scenario=scenario):
+                image = self.create_preset_image(scenario)
+                manifest = json.loads(image.with_suffix(image.suffix + ".manifest.json").read_text(encoding="utf-8"))
+                c_part, e_part = manifest["disk"]["partitions"]
+
+                if expectation == ("E", "free_bytes"):
+                    self.assertLess(e_part["free_bytes"], manifest["workflow"]["minimum_source_free_after_bytes"])
+                elif expectation == ("E", "filesystem_state"):
+                    self.assertEqual(e_part["filesystem_state"], "dirty")
+                elif expectation == ("E", "encrypted"):
+                    self.assertTrue(e_part["encrypted"])
+                elif expectation == ("disk", "operation_state"):
+                    self.assertEqual(manifest["disk"]["operation_state"], "interrupted-move")
+                elif expectation == ("disk", "non_adjacent"):
+                    self.assertGreater(e_part["start_sector"], c_part["end_sector"] + 1)
+                elif expectation == ("disk", "unaligned"):
+                    self.assertNotEqual(c_part["start_sector"] % manifest["disk"]["alignment_sectors"], 0)
+
+    def test_corrupted_payload_and_malformed_manifest_presets_are_available(self) -> None:
+        corrupted = self.create_preset_image("corrupted-payload-marker")
+        corrupted_layout = self.layout_for_image(corrupted)
+        self.assertFalse(corrupted_layout["disk"]["partitions"][1]["payload_marker"]["hash_ok"])
+
+        malformed = self.create_preset_image("malformed-manifest")
+        result = self.run_script("inspect_image.py", "--image", str(malformed), "--layout-json")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected manifest schema", result.stderr)
 
     def test_command_plan_has_geometry_steps_and_real_ntfs_dry_run_steps(self) -> None:
         image = self.create_image("unittest-command-plan")

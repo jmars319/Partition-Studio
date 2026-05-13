@@ -31,6 +31,56 @@ GPT_PARTITION_ENTRY_COUNT = 128
 PAYLOAD_MARKER_OFFSET_BYTES = 4096
 PAYLOAD_MARKER_SIZE_BYTES = 4096
 
+DEFAULT_IMAGE_CONFIG: dict[str, Any] = {
+    "disk_size": "12GiB",
+    "c_size": "4GiB",
+    "e_size": "7GiB",
+    "c_used": "3500MiB",
+    "e_used": "2GiB",
+    "min_source_free_after": "1GiB",
+    "partition_table": "gpt",
+    "layout": "adjacent",
+    "c_filesystem_state": "clean",
+    "e_filesystem_state": "clean",
+    "c_encrypted": False,
+    "e_encrypted": False,
+    "operation_state": None,
+    "corrupt_payload_marker": False,
+    "malformed_manifest": False,
+}
+
+SCENARIO_PRESETS: dict[str, dict[str, Any]] = {
+    "normal-c-e-layout": {},
+    "gpt-layout": {},
+    "e-has-insufficient-free-space": {
+        "e_used": "6500MiB",
+    },
+    "mbr-layout": {
+        "partition_table": "mbr",
+    },
+    "non-adjacent-free-space": {
+        "layout": "non-adjacent",
+    },
+    "unaligned-layout": {
+        "layout": "unaligned",
+    },
+    "dirty-filesystem-placeholder": {
+        "e_filesystem_state": "dirty",
+    },
+    "encrypted-filesystem-placeholder": {
+        "e_encrypted": True,
+    },
+    "interrupted-operation-placeholder": {
+        "operation_state": "interrupted-move",
+    },
+    "corrupted-payload-marker": {
+        "corrupt_payload_marker": True,
+    },
+    "malformed-manifest": {
+        "malformed_manifest": True,
+    },
+}
+
 
 def align_up(value: int, alignment: int) -> int:
     return ((value + alignment - 1) // alignment) * alignment
@@ -115,12 +165,17 @@ def gpt_header(
     return bytes(header)
 
 
-def build_partitions(c_size: str, e_size: str) -> list[dict[str, Any]]:
+def build_partitions(c_size: str, e_size: str, layout: str = "adjacent") -> list[dict[str, Any]]:
     c_sectors = size_to_sectors(c_size)
     e_sectors = size_to_sectors(e_size)
-    c_start = ALIGNMENT_SECTORS
+    c_start = ALIGNMENT_SECTORS + 1 if layout == "unaligned" else ALIGNMENT_SECTORS
     c_end = c_start + c_sectors - 1
-    e_start = align_up(c_end + 1, ALIGNMENT_SECTORS)
+    if layout == "non-adjacent":
+        e_start = align_up(c_end + 1, ALIGNMENT_SECTORS) + ALIGNMENT_SECTORS
+    elif layout == "unaligned":
+        e_start = c_end + 1
+    else:
+        e_start = align_up(c_end + 1, ALIGNMENT_SECTORS)
     e_end = e_start + e_sectors - 1
     return [
         {"number": 1, "label": "C", "start_sector": c_start, "end_sector": c_end},
@@ -246,6 +301,7 @@ def write_manifest(
     c_used_bytes: int,
     e_used_bytes: int,
     min_source_free_after_bytes: int,
+    config: dict[str, Any],
 ) -> None:
     usage_by_label = {
         "C": c_used_bytes,
@@ -255,10 +311,15 @@ def write_manifest(
         "schema": "partition-lab.image-manifest.v1",
         "manifest_version": 2,
         "scenario": scenario,
+        "scenario_preset": scenario if scenario in SCENARIO_PRESETS else None,
         "image_id": image_id,
         "image": str(path),
         "format": "raw",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "validation": {
+            "status": "unsafe" if config.get("operation_state") else "created",
+            "blockers": [config["operation_state"]] if config.get("operation_state") else [],
+        },
         "workflow": {
             "target_label": "C",
             "source_label": "E",
@@ -269,15 +330,16 @@ def write_manifest(
             "sector_size": SECTOR_SIZE,
             "alignment_sectors": ALIGNMENT_SECTORS,
             "size_bytes": disk_size,
+            **({"operation_state": config["operation_state"]} if config.get("operation_state") else {}),
             "partitions": [
                 {
                     **partition,
                     "type": "msftdata",
                     "filesystem": "raw-geometry-placeholder",
                     "intended_filesystem": "ntfs",
-                    "filesystem_state": "clean",
+                    "filesystem_state": config[f"{partition['label'].lower()}_filesystem_state"],
                     "mountpoint": None,
-                    "encrypted": False,
+                    "encrypted": bool(config[f"{partition['label'].lower()}_encrypted"]),
                     "used_bytes": usage_by_label.get(partition["label"], 0),
                     "free_bytes": partition_size_bytes(partition) - usage_by_label.get(partition["label"], 0),
                     "minimum_size_bytes": usage_by_label.get(partition["label"], 0) + min_source_free_after_bytes,
@@ -291,21 +353,78 @@ def write_manifest(
         handle.write("\n")
 
 
+def write_malformed_manifest(path: Path, scenario: str) -> None:
+    manifest = {
+        "schema": "partition-lab.image-manifest.malformed",
+        "scenario": scenario,
+        "error": "This intentionally malformed manifest is used by lab refusal tests.",
+    }
+    with path.with_suffix(path.suffix + ".manifest.json").open("w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2)
+        handle.write("\n")
+
+
+def corrupt_payload_marker(path: Path, partition: dict[str, Any]) -> None:
+    marker = partition.get("payload_marker")
+    if not isinstance(marker, dict):
+        raise ValueError("payload marker metadata is missing")
+    with path.open("r+b") as handle:
+        handle.seek(partition["start_sector"] * SECTOR_SIZE + int(marker["offset_bytes"]))
+        handle.write(b"corrupted-payload-marker")
+
+
+def build_config(args: argparse.Namespace) -> dict[str, Any]:
+    config = dict(DEFAULT_IMAGE_CONFIG)
+    config.update(SCENARIO_PRESETS.get(args.scenario, {}))
+    for key in (
+        "disk_size",
+        "c_size",
+        "e_size",
+        "c_used",
+        "e_used",
+        "min_source_free_after",
+        "partition_table",
+        "layout",
+        "c_filesystem_state",
+        "e_filesystem_state",
+        "operation_state",
+    ):
+        value = getattr(args, key)
+        if value is not None:
+            config[key] = value
+    if args.c_encrypted:
+        config["c_encrypted"] = True
+    if args.e_encrypted:
+        config["e_encrypted"] = True
+    if args.corrupt_payload_marker:
+        config["corrupt_payload_marker"] = True
+    if args.malformed_manifest:
+        config["malformed_manifest"] = True
+    return config
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Create a cross-platform raw tenra Partition Lab disk image.")
     parser.add_argument("--scenario", default="normal-c-e-layout", help="Scenario name used for default filename.")
     parser.add_argument("--output", help="Output image path. Must be under test-images by default.")
-    parser.add_argument("--disk-size", default="12GiB", help="Disk image size. Default: 12GiB.")
-    parser.add_argument("--c-size", default="4GiB", help="C partition size. Default: 4GiB.")
-    parser.add_argument("--e-size", default="7GiB", help="E partition size. Default: 7GiB.")
-    parser.add_argument("--c-used", default="3500MiB", help="Modeled used bytes on C. Default: 3500MiB.")
-    parser.add_argument("--e-used", default="2GiB", help="Modeled used bytes on E. Default: 2GiB.")
+    parser.add_argument("--disk-size", help="Disk image size. Default: 12GiB.")
+    parser.add_argument("--c-size", help="C partition size. Default: 4GiB.")
+    parser.add_argument("--e-size", help="E partition size. Default: 7GiB.")
+    parser.add_argument("--c-used", help="Modeled used bytes on C. Default: 3500MiB.")
+    parser.add_argument("--e-used", help="Modeled used bytes on E. Default: 2GiB.")
     parser.add_argument(
         "--min-source-free-after",
-        default="1GiB",
         help="Modeled minimum free bytes to preserve on E after shrink. Default: 1GiB.",
     )
-    parser.add_argument("--partition-table", choices=("gpt", "mbr"), default="gpt", help="Partition table. Default: gpt.")
+    parser.add_argument("--partition-table", choices=("gpt", "mbr"), help="Partition table. Default: gpt.")
+    parser.add_argument("--layout", choices=("adjacent", "non-adjacent", "unaligned"), help="Partition geometry layout.")
+    parser.add_argument("--c-filesystem-state", choices=("clean", "dirty"), help="Modeled C filesystem state.")
+    parser.add_argument("--e-filesystem-state", choices=("clean", "dirty"), help="Modeled E filesystem state.")
+    parser.add_argument("--c-encrypted", action="store_true", help="Mark C encrypted in the manifest.")
+    parser.add_argument("--e-encrypted", action="store_true", help="Mark E encrypted in the manifest.")
+    parser.add_argument("--operation-state", help="Mark the disk with an unsafe operation state.")
+    parser.add_argument("--corrupt-payload-marker", action="store_true", help="Corrupt E's payload marker after manifest creation.")
+    parser.add_argument("--malformed-manifest", action="store_true", help="Write an intentionally malformed manifest.")
     parser.add_argument("--force", action="store_true", help="Replace an existing image.")
     parser.add_argument("--dry-run", action="store_true", help="Print actions without writing the image.")
     return parser
@@ -316,10 +435,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        disk_size = parse_size(args.disk_size)
-        c_used_bytes = parse_size(args.c_used)
-        e_used_bytes = parse_size(args.e_used)
-        min_source_free_after_bytes = parse_size(args.min_source_free_after)
+        config = build_config(args)
+        disk_size = parse_size(config["disk_size"])
+        c_used_bytes = parse_size(config["c_used"])
+        e_used_bytes = parse_size(config["e_used"])
+        min_source_free_after_bytes = parse_size(config["min_source_free_after"])
         if disk_size % SECTOR_SIZE:
             raise ValueError("--disk-size must be sector-aligned")
         output = Path(args.output) if args.output else TEST_IMAGES_DIR / f"{args.scenario}.raw.img"
@@ -329,7 +449,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError(f"output must be under {TEST_IMAGES_DIR}")
         if output.exists() and not args.force:
             raise ValueError(f"output already exists; use --force: {output}")
-        partitions = build_partitions(args.c_size, args.e_size)
+        partitions = build_partitions(config["c_size"], config["e_size"], config["layout"])
         if partitions[-1]["end_sector"] >= disk_size // SECTOR_SIZE:
             raise ValueError("C and E partitions do not fit in the requested disk image")
         for partition, used_bytes in ((partitions[0], c_used_bytes), (partitions[1], e_used_bytes)):
@@ -341,10 +461,12 @@ def main(argv: list[str] | None = None) -> int:
 
     actions = [
         f"create sparse raw image: {output}",
-        f"write {args.partition_table.upper()} partition table",
+        f"write {config['partition_table'].upper()} partition table",
         "write deterministic payload markers",
-        "write manifest JSON",
+        "write malformed manifest JSON" if config["malformed_manifest"] else "write manifest JSON",
     ]
+    if config["corrupt_payload_marker"]:
+        actions.append("corrupt E payload marker")
     for action in actions:
         print(f"+ {action}")
     if args.dry_run:
@@ -353,22 +475,28 @@ def main(argv: list[str] | None = None) -> int:
     if output.exists():
         output.unlink()
     create_sparse_file(output, disk_size)
-    if args.partition_table == "gpt":
+    if config["partition_table"] == "gpt":
         write_gpt_image(output, disk_size, partitions)
     else:
         write_mbr_image(output, disk_size, partitions)
     write_payload_markers(output, image_id, partitions)
-    write_manifest(
-        output,
-        args.scenario,
-        image_id,
-        args.partition_table,
-        disk_size,
-        partitions,
-        c_used_bytes,
-        e_used_bytes,
-        min_source_free_after_bytes,
-    )
+    if config["malformed_manifest"]:
+        write_malformed_manifest(output, args.scenario)
+    else:
+        write_manifest(
+            output,
+            args.scenario,
+            image_id,
+            config["partition_table"],
+            disk_size,
+            partitions,
+            c_used_bytes,
+            e_used_bytes,
+            min_source_free_after_bytes,
+            config,
+        )
+    if config["corrupt_payload_marker"]:
+        corrupt_payload_marker(output, partitions[1])
     print(f"Created disposable raw image: {output}")
     print("Note: raw fallback images are partitioned but not NTFS-formatted.")
     return 0
