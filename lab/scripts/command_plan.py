@@ -117,6 +117,57 @@ def real_ntfs_steps(layout: dict[str, Any], increase_bytes: int, target_label: s
     ]
 
 
+def planner_blocker_ids(planner: dict[str, Any]) -> list[str]:
+    return [str(blocker["id"]) for blocker in planner.get("blockers", []) if "id" in blocker]
+
+
+def manifest_blocker_ids(layout: dict[str, Any]) -> list[str]:
+    validation = layout.get("manifest_validation")
+    if not isinstance(validation, dict):
+        return []
+    return [
+        str(item["id"])
+        for item in validation.get("issues", [])
+        if isinstance(item, dict) and item.get("severity") in {"blocking", "error"} and item.get("id")
+    ]
+
+
+def tool_blocker_ids(tool_names: list[str]) -> list[str]:
+    return [f"tool-missing-{name}" for name in tool_names]
+
+
+def raw_geometry_blocker_ids(layout: dict[str, Any], planner: dict[str, Any], capabilities: dict[str, Any]) -> list[str]:
+    blockers = planner_blocker_ids(planner)
+    blockers.extend(manifest_blocker_ids(layout))
+    blockers.extend(capabilities["modes"]["raw_geometry"].get("blockers", []))
+    if layout.get("mode") != "raw-geometry":
+        blockers.append("layout-mode-not-raw-geometry")
+    image = layout.get("image", {})
+    if not isinstance(image, dict) or not image.get("path"):
+        blockers.append("layout-image-path-missing")
+    if layout.get("disk", {}).get("label") != "gpt":
+        blockers.append("partition-table-not-gpt")
+    return sorted(set(blockers))
+
+
+def real_ntfs_blocker_ids(layout: dict[str, Any], planner: dict[str, Any], capabilities: dict[str, Any]) -> list[str]:
+    blockers = planner_blocker_ids(planner)
+    blockers.extend(manifest_blocker_ids(layout))
+    blockers.extend(tool_blocker_ids(capabilities["modes"]["real_ntfs"].get("blockers", [])))
+    if layout.get("disk", {}).get("label") != "gpt":
+        blockers.append("partition-table-not-gpt")
+    return sorted(set(blockers))
+
+
+def vm_blocker_ids(layout: dict[str, Any], planner: dict[str, Any], capabilities: dict[str, Any]) -> list[str]:
+    blockers = planner_blocker_ids(planner)
+    blockers.extend(manifest_blocker_ids(layout))
+    blockers.extend(tool_blocker_ids(capabilities["modes"]["gparted_live_vm"].get("blockers", [])))
+    if layout.get("disk", {}).get("label") != "gpt":
+        blockers.append("partition-table-not-gpt")
+    return sorted(set(blockers))
+
+
 def build_command_plan(
     layout: dict[str, Any],
     increase_bytes: int,
@@ -127,15 +178,10 @@ def build_command_plan(
     capabilities = discover_capabilities()
     planner = plan_operation(layout, increase_bytes, target_label, source_label, min_source_free_after_bytes)
     planner_ready = planner["plan_status"] == "ready"
-    geometry_blockers = [] if planner_ready else [blocker["id"] for blocker in planner["blockers"]]
-    real_ntfs_blockers = list(geometry_blockers)
-    real_ntfs_blockers.extend(capabilities["modes"]["real_ntfs"]["blockers"])
-
+    geometry_blockers = raw_geometry_blocker_ids(layout, planner, capabilities)
+    real_ntfs_blockers = real_ntfs_blocker_ids(layout, planner, capabilities)
+    vm_blockers = vm_blocker_ids(layout, planner, capabilities)
     image = layout.get("image", {})
-    if layout.get("mode") != "raw-geometry":
-        geometry_blockers.append("layout-mode-not-raw-geometry")
-    if not isinstance(image, dict) or not image.get("path"):
-        geometry_blockers.append("layout-image-path-missing")
 
     return {
         "schema": SCHEMA_COMMAND_PLAN,
@@ -163,6 +209,7 @@ def build_command_plan(
             "raw_geometry": {
                 "status": "ready" if not geometry_blockers else "blocked",
                 "writes": True,
+                "dry_run_only": False,
                 "blockers": geometry_blockers,
                 "steps": geometry_steps(layout, increase_bytes, target_label, source_label) if not geometry_blockers else [],
             },
@@ -172,6 +219,19 @@ def build_command_plan(
                 "writes": True,
                 "blockers": real_ntfs_blockers,
                 "steps": real_ntfs_steps(layout, increase_bytes, target_label, source_label) if planner_ready else [],
+            },
+            "gparted_live_vm": {
+                "status": "ready" if not vm_blockers else "blocked",
+                "dry_run_only": True,
+                "writes": True,
+                "blockers": vm_blockers,
+                "steps": [
+                    _step(1, "clone-vm-work-image", "clone the disposable image for VM comparison", False, ["qemu-img", "convert", "<source-image>", "<work-image>"]),
+                    _step(2, "boot-gparted-live", "boot GParted Live with the work image attached", False, ["qemu-system-x86_64", "-cdrom", "<gparted-live.iso>", "-drive", "file=<work-image>,format=raw"]),
+                    _step(3, "compare-layout", "compare Tenra command plan with GParted Live inspection", False),
+                ]
+                if planner_ready
+                else [],
             },
         },
     }

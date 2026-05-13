@@ -119,6 +119,12 @@ class RawImageNormalizationTests(unittest.TestCase):
         path.write_text(json.dumps(layout, indent=2), encoding="utf-8")
         return path
 
+    def command_plan_for_image(self, name: str, image: Path, increase: str = "1GiB") -> dict[str, object]:
+        layout_path = self.write_layout_file(name, self.layout_for_image(image))
+        result = self.run_script("command_plan.py", "--layout", str(layout_path), "--increase-c", increase, "--json")
+        self.assertIn(result.returncode, {0, 2}, result.stderr)
+        return json.loads(result.stdout)
+
     def test_raw_gpt_image_manifest_and_layout_are_planner_compatible(self) -> None:
         image = self.create_image("unittest-normalize-gpt")
         manifest = json.loads(image.with_suffix(image.suffix + ".manifest.json").read_text(encoding="utf-8"))
@@ -224,6 +230,32 @@ class RawImageNormalizationTests(unittest.TestCase):
         self.assertTrue(command_plan["modes"]["real_ntfs"]["dry_run_only"])
         self.assertGreater(len(command_plan["modes"]["real_ntfs"]["steps"]), 0)
         self.assertIn("ntfsresize", " ".join(command_plan["modes"]["real_ntfs"]["steps"][1]["command"]))
+        self.assertIn("gparted_live_vm", command_plan["modes"])
+
+    def test_command_plan_reports_stable_blockers_for_unsafe_scenarios(self) -> None:
+        cases = {
+            "mbr-layout": "partition-table-not-gpt",
+            "e-has-insufficient-free-space": "source-free-insufficient",
+            "non-adjacent-free-space": "partition-adjacency",
+            "unaligned-layout": "layout-invalid",
+            "dirty-filesystem-placeholder": "source-filesystem-state",
+            "encrypted-filesystem-placeholder": "source-encrypted",
+            "interrupted-operation-placeholder": "operation-state",
+            "corrupted-payload-marker": "payload-marker-hash-mismatch",
+        }
+
+        for scenario, blocker in cases.items():
+            with self.subTest(scenario=scenario):
+                command_plan = self.command_plan_for_image(f"unittest-plan-{scenario}", self.create_preset_image(scenario))
+                raw_mode = command_plan["modes"]["raw_geometry"]
+                self.assertEqual(raw_mode["status"], "blocked")
+                self.assertIn(blocker, set(raw_mode["blockers"]))
+
+    def test_command_plan_reports_tool_blockers_for_real_ntfs_and_vm_modes(self) -> None:
+        command_plan = self.command_plan_for_image("unittest-tool-blockers", self.create_preset_image("normal-c-e-layout"))
+
+        self.assertIn("tool-missing-ntfsresize", set(command_plan["modes"]["real_ntfs"]["blockers"]))
+        self.assertIn("tool-missing-qemu-img", set(command_plan["modes"]["gparted_live_vm"]["blockers"]))
 
     def test_geometry_run_mutates_work_copy_and_verifies_result(self) -> None:
         image = self.create_image("unittest-geometry-run")
