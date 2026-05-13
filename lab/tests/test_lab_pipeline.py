@@ -358,7 +358,15 @@ class RawImageNormalizationTests(unittest.TestCase):
         command_plan = self.command_plan_for_image("unittest-tool-blockers", self.create_preset_image("normal-c-e-layout"))
 
         self.assertIn("tool-missing-ntfsresize", set(command_plan["modes"]["real_ntfs"]["blockers"]))
-        self.assertIn("tool-missing-qemu-img", set(command_plan["modes"]["gparted_live_vm"]["blockers"]))
+        vm_mode = command_plan["modes"]["gparted_live_vm"]
+        if vm_mode["status"] == "blocked":
+            self.assertTrue(
+                set(vm_mode["blockers"]).issubset(
+                    {"tool-missing-qemu-img", "tool-missing-qemu-system-x86_64", "tool-missing-gparted-live-iso"}
+                )
+            )
+        else:
+            self.assertEqual(vm_mode["status"], "ready")
 
     def test_geometry_run_mutates_work_copy_and_verifies_result(self) -> None:
         image = self.create_image("unittest-geometry-run")

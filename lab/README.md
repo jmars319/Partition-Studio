@@ -11,6 +11,8 @@ See [docs/gparted-live-reference.md](docs/gparted-live-reference.md) for how the
 local GParted Live ISO informs the lab toolchain and staged execution plan.
 See [docs/raw-image-safety-matrix.md](docs/raw-image-safety-matrix.md) for the
 current pure-Python disposable raw-image scenario matrix.
+See [docs/mac-pre-windows-validation.md](docs/mac-pre-windows-validation.md)
+for the macOS validation lane before Windows NTFS testing.
 
 The lab models and tests this workflow:
 
@@ -43,12 +45,17 @@ Implemented:
 - Cross-platform raw image creation under `test-images/` using pure Python.
 - Read-only raw image inspection using a pure Python GPT/MBR parser, with optional `parted`, `sgdisk`, and `lsblk` enrichment when available.
 - Host capability discovery for native partition, NTFS, VM, Windows VHDX, and checksum tools.
+- Optional macOS validation using `sgdisk`, `qemu-img`, `qemu-system-x86_64`, and the local GParted Live ISO when available.
 - Normalized `partition-lab.layout.v1` output from disposable raw image inspection.
 - Dry-run command plans for real NTFS tooling and executable geometry-only raw image steps.
+- Independent GPT cross-check reports with `partition-lab.sgdisk-check.v1`.
+- QEMU image validation and optional raw-to-qcow2 conversion reports with `partition-lab.qemu-image-check.v1`.
+- Full disposable scenario batch reports with `partition-lab.batch-report.v1`.
+- GParted Live VM comparison plans with `partition-lab.vm-plan.v1`, scoped to cloned disposable images only.
 - Guarded geometry-only raw image mutation against per-run work copies under `runs/`.
 - Geometry verification for final C/E layout, payload marker hashes, and source image preservation.
 - Simulated interruption tests for snapshot, byte move, GPT rewrite, manifest update, and verification stages.
-- Desktop import and display for capability, command-plan, geometry-run, and verification artifacts.
+- Desktop import and display for capability, command-plan, geometry-run, verification, batch-report, and VM-plan artifacts.
 - A local browser dashboard for selecting fixtures, entering operation inputs, viewing disk layout, and watching the mock process queue.
 - A guarded destructive-mode entrypoint that performs safety checks, delegates only explicit geometry-only lab mode, and refuses real NTFS mutation.
 
@@ -56,7 +63,7 @@ Not implemented yet:
 
 - Real NTFS shrink, move, or grow execution.
 - Physical disk mutation.
-- VM orchestration.
+- Automated VM boot/control and GParted GUI operation.
 - Any polished UI or GUI app.
 - Any claim that this is safe for production disks.
 
@@ -83,7 +90,7 @@ Modes are intentionally separate:
 - Raw image mode: regular raw image files under `test-images/`.
 - Raw geometry mode: lab-only GPT geometry mutation on a work copy, with no real NTFS shrink/grow.
 - Loop-device mode: disposable loop devices attached to lab images only.
-- Future VM mode: not implemented.
+- VM comparison mode: command-plan scaffold only, against cloned disposable images.
 
 Safe-to-test currently means safe to test the planner, normalization, dry-run command planning, and geometry-only raw image mutation against disposable image work copies. It does not mean safe for physical disks or real NTFS mutation.
 
@@ -150,6 +157,24 @@ Discover host capabilities:
 
 ```bash
 scripts/discover_capabilities.py --json
+```
+
+Run the full macOS disposable-image matrix:
+
+```bash
+scripts/run_scenario_batch.py --json
+```
+
+Cross-check a raw GPT image with `sgdisk`:
+
+```bash
+scripts/gpt_cross_check.py --image test-images/normal-c-e-layout.raw.img --json
+```
+
+Validate a raw image with `qemu-img`:
+
+```bash
+scripts/qemu_image_check.py --image test-images/normal-c-e-layout.raw.img --json
 ```
 
 ## Fixtures
@@ -296,6 +321,28 @@ The source image is not modified. The runner writes a per-run directory under
 - `geometry-run.json`
 - the mutated work image and work manifest
 
+Run the full disposable scenario matrix:
+
+```bash
+scripts/run_scenario_batch.py --json
+```
+
+The batch report writes `partition-lab.batch-report.v1` under `runs/` and
+records pass, blocked, and fail counts, blocker IDs, optional `sgdisk`/`qemu-img`
+checks, geometry-run artifacts, and source fingerprint preservation.
+
+Generate a GParted Live VM comparison plan:
+
+```bash
+scripts/vm_plan.py \
+  --image test-images/normal-c-e-layout.raw.img \
+  --json
+```
+
+This creates a cloned work image under `runs/`, emits a `partition-lab.vm-plan.v1`
+artifact, and prints the QEMU command. It does not boot the VM or automate
+GParted.
+
 Simulate an interrupted run:
 
 ```bash
@@ -368,7 +415,7 @@ Windows VHDX images are deterministic rebuild targets. Reset them with `reset-te
 
 Raw images are useful for portable parsing tests and future QEMU work.
 
-For VM experiments later, a raw image can be converted to a qcow2 base and used with disposable overlays:
+For VM experiments, a raw image can be converted to a qcow2 base and used with disposable overlays:
 
 ```bash
 qemu-img convert -f raw -O qcow2 test-images/normal-c-e-layout.raw.img test-images/normal-c-e-layout.base.qcow2

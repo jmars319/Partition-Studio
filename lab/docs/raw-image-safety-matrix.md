@@ -20,9 +20,34 @@ The pure-Python lab path is safe-to-test only for disposable raw images under
 | `interrupted-operation-placeholder` | Planner blocks with `operation-state`. |
 | `corrupted-payload-marker` | Manifest validation blocks with `payload-marker-hash-mismatch`. |
 | `malformed-manifest` | Inspection refuses before layout normalization. |
+| `missing-manifest` | Inspection refuses before layout normalization. |
+| `too-large-requested-expansion` | Planner blocks with `source-free-insufficient`. |
 
 Missing manifests are tested by deleting the generated
 `.raw.img.manifest.json` sidecar before inspection.
+
+Run the matrix with:
+
+```bash
+scripts/run_scenario_batch.py --json
+```
+
+The batch runner emits `partition-lab.batch-report.v1` under `runs/`, including
+scenario statuses, blocker IDs, artifact paths, optional `sgdisk`/`qemu-img`
+checks, geometry-run outputs, and source fingerprint preservation.
+
+## Optional Mac Validation
+
+When installed, `sgdisk` and `qemu-img` add independent checks:
+
+```bash
+scripts/gpt_cross_check.py --image test-images/normal-c-e-layout.raw.img --json
+scripts/qemu_image_check.py --image test-images/normal-c-e-layout.raw.img --json
+```
+
+`scripts/vm_plan.py --image ... --json` creates a cloned VM work image and a
+`partition-lab.vm-plan.v1` command plan for manual GParted Live comparison. It
+does not boot QEMU or automate GParted.
 
 ## Interruption Simulation
 
@@ -48,6 +73,7 @@ The desktop app can import these read-only lab artifacts:
 - `partition-lab.command-plan.v1`
 - `partition-lab.geometry-run.v1`
 - `partition-lab.verify.v1`
+- `partition-lab.batch-report.v1`
+- `partition-lab.vm-plan.v1`
 
 The app displays them for review only. It does not execute lab scripts.
-

@@ -9,13 +9,14 @@ The project intentionally does not implement these items yet:
 - Crash recovery after an interrupted real move.
 - BitLocker or encrypted-volume handling.
 - Dirty NTFS repair.
-- VM orchestration.
-- GUI or app frontend.
+- Automated VM boot/control or GParted GUI operation.
+- UI-triggered local script execution.
 - Production safety guarantees.
 
 The current lab can normalize disposable raw image layouts and run geometry-only
 mutation against work copies. The next implementation step is real NTFS
-shrink/grow validation in a disposable VM or Windows-admin VHDX path. Only after
-that should real filesystem mutation be considered.
-The GParted Live ISO can be used as a reference and future VM payload for this
-work, but it does not make write-mode execution available by itself.
+shrink/grow validation in a disposable VM or Windows-admin VHDX path. The macOS
+lab can now generate `sgdisk`, `qemu-img`, batch, and GParted Live VM-plan
+artifacts, but those artifacts still do not make write-mode NTFS execution
+available by themselves. Only after real filesystem validation should real
+mutation be considered.

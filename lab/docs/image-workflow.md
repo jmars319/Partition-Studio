@@ -95,9 +95,51 @@ scripts/run_geometry_operation.py \
 Geometry-only mode rewrites GPT boundaries and moves raw bytes in the work copy
 only. It does not perform real NTFS shrink or grow operations.
 
-Import generated capability, command-plan, geometry-run, or verification JSON
-through the desktop app's Lab artifact import to review results without running
-scripts from the UI.
+Cross-check GPT geometry with `sgdisk` when available:
+
+```bash
+scripts/gpt_cross_check.py \
+  --image test-images/normal-c-e-layout.raw.img \
+  --json
+```
+
+Validate raw image metadata with `qemu-img`:
+
+```bash
+scripts/qemu_image_check.py \
+  --image test-images/normal-c-e-layout.raw.img \
+  --json
+```
+
+Optionally create a qcow2 copy under `runs/`:
+
+```bash
+scripts/qemu_image_check.py \
+  --image test-images/normal-c-e-layout.raw.img \
+  --convert-qcow2 \
+  --json
+```
+
+Run the full disposable raw-image matrix:
+
+```bash
+scripts/run_scenario_batch.py --json
+```
+
+Generate a GParted Live VM comparison plan:
+
+```bash
+scripts/vm_plan.py \
+  --image test-images/normal-c-e-layout.raw.img \
+  --json
+```
+
+The VM plan clones the source image under `runs/` and emits the QEMU command for
+manual GParted comparison. It does not boot the VM or automate the GParted UI.
+
+Import generated capability, command-plan, geometry-run, verification, batch, or
+VM-plan JSON through the desktop app's Lab artifact import to review results
+without running scripts from the UI.
 
 ## Linux Bash Path
 
