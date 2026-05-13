@@ -7,6 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# tenra Partition Lab generated artifacts
+lab/logs/
+lab/runs/
+lab/test-images/*
+!lab/test-images/.gitkeep
+*.raw.img
+*.vhdx
+*.vhd
+*.qcow2
+
 node_modules
 dist
 dist-ssr
