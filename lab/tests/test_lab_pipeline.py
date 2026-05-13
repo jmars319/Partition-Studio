@@ -319,6 +319,22 @@ class RawImageNormalizationTests(unittest.TestCase):
             )
         )
 
+    def test_vm_plan_clones_only_disposable_images_when_available(self) -> None:
+        image = self.create_image("unittest-vm-plan")
+        result = self.run_script("vm_plan.py", "--image", str(image), "--json")
+
+        self.assertIn(result.returncode, {0, 2}, result.stderr)
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan["schema"], "partition-lab.vm-plan.v1")
+        if plan["status"] == "ready":
+            self.created_dirs.append(Path(plan["run_dir"]))
+            self.assertTrue(Path(plan["work_image"]["path"]).exists())
+            self.assertNotEqual(Path(plan["work_image"]["path"]), image)
+            self.assertIn("qemu-system-x86_64", plan["qemu_command"][0])
+            self.assertIn(str(Path(plan["work_image"]["path"])), " ".join(plan["qemu_command"]))
+        else:
+            self.assertTrue(plan["blockers"])
+
     def test_command_plan_reports_stable_blockers_for_unsafe_scenarios(self) -> None:
         cases = {
             "mbr-layout": "partition-table-not-gpt",
