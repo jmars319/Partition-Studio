@@ -96,6 +96,12 @@ class RawImageNormalizationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
+    def write_layout_file(self, name: str, layout: dict[str, object]) -> Path:
+        path = TEST_IMAGES_DIR / f"{name}.layout.json"
+        self.created.append(path)
+        path.write_text(json.dumps(layout, indent=2), encoding="utf-8")
+        return path
+
     def test_raw_gpt_image_manifest_and_layout_are_planner_compatible(self) -> None:
         image = self.create_image("unittest-normalize-gpt")
         manifest = json.loads(image.with_suffix(image.suffix + ".manifest.json").read_text(encoding="utf-8"))
@@ -124,6 +130,28 @@ class RawImageNormalizationTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing image manifest", result.stderr)
+
+    def test_command_plan_has_geometry_steps_and_real_ntfs_dry_run_steps(self) -> None:
+        image = self.create_image("unittest-command-plan")
+        layout_path = self.write_layout_file("unittest-command-plan", self.layout_for_image(image))
+
+        result = self.run_script(
+            "command_plan.py",
+            "--layout",
+            str(layout_path),
+            "--increase-c",
+            "8MiB",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        command_plan = json.loads(result.stdout)
+
+        self.assertEqual(command_plan["schema"], "partition-lab.command-plan.v1")
+        self.assertEqual(command_plan["modes"]["raw_geometry"]["status"], "ready")
+        self.assertGreater(len(command_plan["modes"]["raw_geometry"]["steps"]), 0)
+        self.assertTrue(command_plan["modes"]["real_ntfs"]["dry_run_only"])
+        self.assertGreater(len(command_plan["modes"]["real_ntfs"]["steps"]), 0)
+        self.assertIn("ntfsresize", " ".join(command_plan["modes"]["real_ntfs"]["steps"][1]["command"]))
 
 
 if __name__ == "__main__":
