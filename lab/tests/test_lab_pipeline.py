@@ -398,6 +398,64 @@ class RawImageNormalizationTests(unittest.TestCase):
         )
         self.assertIn("plan-windows-ntfs", {item["id"] for item in handoff["next_windows_commands"]})
 
+    def test_windows_ntfs_plan_is_dry_run_only_and_refuses_physical_disks(self) -> None:
+        image = TEST_IMAGES_DIR / f"future-windows-{uuid.uuid4().hex}.vhdx"
+        result = self.run_script(
+            "plan_windows_ntfs_operation.py",
+            "--image",
+            str(image),
+            "--increase-c",
+            "40G",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan["schema"], "partition-lab.windows-ntfs-plan.v1")
+        self.assertEqual(plan["status"], "dry-run-only")
+        self.assertFalse(plan["execution"]["enabled"])
+        self.assertIn("real-ntfs-mutation-not-implemented", {item["id"] for item in plan["blockers"]})
+
+        refused = self.run_script(
+            "plan_windows_ntfs_operation.py",
+            "--image",
+            r"\\.\PhysicalDrive0",
+            "--json",
+        )
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        refused_plan = json.loads(refused.stdout)
+        self.assertEqual(refused_plan["status"], "refused")
+        self.assertIn("physical-disk-refused", {item["id"] for item in refused_plan["blockers"]})
+
+    def test_vm_launcher_prints_by_default_and_requires_acknowledgement_to_launch(self) -> None:
+        plan_path = TEST_IMAGES_DIR / f"unittest-vm-plan-{uuid.uuid4().hex}.json"
+        self.created.append(plan_path)
+        plan_path.write_text(
+            json.dumps(
+                {
+                    "schema": "partition-lab.vm-plan.v1",
+                    "plan_id": "unittest-vm-plan",
+                    "status": "ready",
+                    "blockers": [],
+                    "qemu_command": ["qemu-system-x86_64", "-version"],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        printed = self.run_script("launch_vm_plan.py", "--plan", str(plan_path), "--json")
+        self.assertEqual(printed.returncode, 0, printed.stderr)
+        printed_result = json.loads(printed.stdout)
+        self.assertEqual(printed_result["schema"], "partition-lab.vm-launch.v1")
+        self.assertEqual(printed_result["status"], "printed")
+        self.assertFalse(printed_result["execution"]["launched"])
+
+        blocked = self.run_script("launch_vm_plan.py", "--plan", str(plan_path), "--launch", "--json")
+        self.assertEqual(blocked.returncode, 2, blocked.stderr)
+        blocked_result = json.loads(blocked.stdout)
+        self.assertEqual(blocked_result["status"], "blocked")
+        self.assertIn("launch-acknowledgement-missing", {item["id"] for item in blocked_result["blockers"]})
+
     def test_command_plan_reports_stable_blockers_for_unsafe_scenarios(self) -> None:
         cases = {
             "mbr-layout": "partition-table-not-gpt",
