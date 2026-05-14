@@ -204,11 +204,29 @@ class RawImageNormalizationTests(unittest.TestCase):
             ("dirty-filesystem-placeholder", "manifest-filesystem-state"),
             ("encrypted-filesystem-placeholder", "manifest-encrypted"),
             ("interrupted-operation-placeholder", "manifest-operation-state"),
+            ("backup-gpt-header-corrupt", "gpt-backup-header-invalid"),
+            ("gpt-entry-crc-mismatch", "gpt-entry-crc-mismatch"),
         ):
             with self.subTest(scenario=scenario):
                 layout = self.layout_for_image(self.create_preset_image(scenario))
                 self.assertEqual(layout["manifest_validation"]["status"], "blocked")
                 self.assertIn(issue_id, {issue["id"] for issue in layout["manifest_validation"]["issues"]})
+
+    def test_corrupt_gpt_and_manifest_mismatch_scenarios_refuse_or_block(self) -> None:
+        refusal_cases = {
+            "primary-gpt-header-corrupt": "no raw GPT/MBR partition table was parsed",
+            "truncated-image": "manifest disk size does not match parsed image",
+            "manifest-sector-size-mismatch": "manifest sector size does not match parsed image",
+            "manifest-disk-size-mismatch": "manifest disk size does not match parsed image",
+            "manifest-partition-bounds-mismatch": "partition 2 start_sector does not match parsed image",
+        }
+
+        for scenario, message in refusal_cases.items():
+            with self.subTest(scenario=scenario):
+                image = self.create_preset_image(scenario)
+                result = self.run_script("inspect_image.py", "--image", str(image), "--layout-json")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stderr)
 
     def test_command_plan_has_geometry_steps_and_real_ntfs_dry_run_steps(self) -> None:
         image = self.create_image("unittest-command-plan")
@@ -361,10 +379,13 @@ class RawImageNormalizationTests(unittest.TestCase):
             "e-has-insufficient-free-space": "source-free-insufficient",
             "non-adjacent-free-space": "partition-adjacency",
             "unaligned-layout": "layout-invalid",
+            "overlapping-partitions": "layout-invalid",
             "dirty-filesystem-placeholder": "source-filesystem-state",
             "encrypted-filesystem-placeholder": "source-encrypted",
             "interrupted-operation-placeholder": "operation-state",
             "corrupted-payload-marker": "payload-marker-hash-mismatch",
+            "backup-gpt-header-corrupt": "gpt-backup-header-invalid",
+            "gpt-entry-crc-mismatch": "gpt-entry-crc-mismatch",
         }
 
         for scenario, blocker in cases.items():

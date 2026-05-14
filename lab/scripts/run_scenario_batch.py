@@ -47,6 +47,14 @@ SCENARIOS: list[dict[str, Any]] = [
     {"name": "missing-manifest", "delete_manifest": True},
     {"name": "corrupted-payload-marker", "create_args": {"--corrupt-payload-marker": None}},
     {"name": "too-large-requested-expansion", "increase": "96MiB"},
+    {"name": "primary-gpt-header-corrupt"},
+    {"name": "backup-gpt-header-corrupt"},
+    {"name": "gpt-entry-crc-mismatch"},
+    {"name": "overlapping-partitions"},
+    {"name": "truncated-image"},
+    {"name": "manifest-sector-size-mismatch"},
+    {"name": "manifest-disk-size-mismatch"},
+    {"name": "manifest-partition-bounds-mismatch"},
 ]
 
 

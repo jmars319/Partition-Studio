@@ -11,6 +11,7 @@ import struct
 import subprocess
 import sys
 import uuid
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -112,6 +113,57 @@ def parse_mbr_entry(entry: bytes, number: int, handle: Any) -> dict[str, Any] | 
     }
 
 
+def gpt_blocker(issue_id: str, message: str) -> dict[str, str]:
+    return issue(issue_id, "blocking", message)
+
+
+def gpt_header_crc_ok(header: bytes) -> bool:
+    if len(header) < 92:
+        return False
+    header_size = struct.unpack_from("<I", header, 12)[0]
+    if header_size < 92 or header_size > len(header):
+        return False
+    stored_crc = struct.unpack_from("<I", header, 16)[0]
+    candidate = bytearray(header[:header_size])
+    struct.pack_into("<I", candidate, 16, 0)
+    return (zlib.crc32(candidate) & 0xFFFFFFFF) == stored_crc
+
+
+def validate_gpt(
+    handle: Any,
+    header: bytes,
+    size: int,
+    partition_entries: bytes,
+) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    total_sectors = size // SECTOR_SIZE
+    if not gpt_header_crc_ok(header):
+        issues.append(gpt_blocker("gpt-primary-header-crc-mismatch", "primary GPT header CRC does not match"))
+
+    backup_lba = struct.unpack_from("<Q", header, 32)[0]
+    entries_crc = struct.unpack_from("<I", header, 88)[0]
+    actual_entries_crc = zlib.crc32(partition_entries) & 0xFFFFFFFF
+    if actual_entries_crc != entries_crc:
+        issues.append(gpt_blocker("gpt-entry-crc-mismatch", "GPT partition-entry array CRC does not match"))
+
+    if backup_lba >= total_sectors:
+        issues.append(gpt_blocker("gpt-backup-header-out-of-range", "backup GPT header points outside the image"))
+        return issues
+
+    handle.seek(backup_lba * SECTOR_SIZE)
+    backup_header = handle.read(SECTOR_SIZE)
+    if len(backup_header) < SECTOR_SIZE or backup_header[0:8] != b"EFI PART":
+        issues.append(gpt_blocker("gpt-backup-header-invalid", "backup GPT header is missing or invalid"))
+        return issues
+    if not gpt_header_crc_ok(backup_header):
+        issues.append(gpt_blocker("gpt-backup-header-crc-mismatch", "backup GPT header CRC does not match"))
+    backup_current_lba = struct.unpack_from("<Q", backup_header, 24)[0]
+    backup_backup_lba = struct.unpack_from("<Q", backup_header, 32)[0]
+    if backup_current_lba != backup_lba or backup_backup_lba != 1:
+        issues.append(gpt_blocker("gpt-backup-header-location-mismatch", "backup GPT header location fields are inconsistent"))
+    return issues
+
+
 def parse_raw_partition_table(path: Path) -> dict[str, Any] | None:
     """Parse GPT or MBR directly from a raw image file."""
     try:
@@ -138,8 +190,10 @@ def parse_raw_partition_table(path: Path) -> dict[str, Any] | None:
                 partition_entry_size = struct.unpack_from("<I", header, 84)[0]
                 partitions = []
                 handle.seek(partition_entry_lba * SECTOR_SIZE)
+                partition_entries = handle.read(partition_entry_count * partition_entry_size)
                 for index in range(partition_entry_count):
-                    entry = handle.read(partition_entry_size)
+                    start = index * partition_entry_size
+                    entry = partition_entries[start : start + partition_entry_size]
                     if len(entry) < 56:
                         break
                     type_guid = uuid.UUID(bytes_le=entry[0:16])
@@ -172,6 +226,7 @@ def parse_raw_partition_table(path: Path) -> dict[str, Any] | None:
                     "sector_size": SECTOR_SIZE,
                     "size_bytes": size,
                     "partitions": partitions,
+                    "gpt_validation_issues": validate_gpt(handle, header, size, partition_entries),
                 }
 
             return {
@@ -201,7 +256,7 @@ def load_image_manifest(path: Path) -> dict[str, Any] | None:
 
 
 def validate_image_manifest(path: Path, raw: dict[str, Any], manifest: dict[str, Any]) -> list[dict[str, str]]:
-    issues: list[dict[str, str]] = []
+    issues: list[dict[str, str]] = list(raw.get("gpt_validation_issues", []))
     manifest_disk = manifest.get("disk")
     if not isinstance(manifest.get("image_id"), str) or not manifest["image_id"]:
         issues.append(issue("manifest-image-id-missing", "error", "manifest.image_id must be a non-empty string"))

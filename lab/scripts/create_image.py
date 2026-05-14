@@ -47,6 +47,13 @@ DEFAULT_IMAGE_CONFIG: dict[str, Any] = {
     "operation_state": None,
     "corrupt_payload_marker": False,
     "malformed_manifest": False,
+    "corrupt_primary_gpt_header": False,
+    "corrupt_backup_gpt_header": False,
+    "corrupt_gpt_entry_crc": False,
+    "truncate_image": False,
+    "manifest_sector_size_mismatch": False,
+    "manifest_disk_size_mismatch": False,
+    "manifest_partition_bounds_mismatch": False,
 }
 
 SCENARIO_PRESETS: dict[str, dict[str, Any]] = {
@@ -78,6 +85,30 @@ SCENARIO_PRESETS: dict[str, dict[str, Any]] = {
     },
     "malformed-manifest": {
         "malformed_manifest": True,
+    },
+    "primary-gpt-header-corrupt": {
+        "corrupt_primary_gpt_header": True,
+    },
+    "backup-gpt-header-corrupt": {
+        "corrupt_backup_gpt_header": True,
+    },
+    "gpt-entry-crc-mismatch": {
+        "corrupt_gpt_entry_crc": True,
+    },
+    "overlapping-partitions": {
+        "layout": "overlap",
+    },
+    "truncated-image": {
+        "truncate_image": True,
+    },
+    "manifest-sector-size-mismatch": {
+        "manifest_sector_size_mismatch": True,
+    },
+    "manifest-disk-size-mismatch": {
+        "manifest_disk_size_mismatch": True,
+    },
+    "manifest-partition-bounds-mismatch": {
+        "manifest_partition_bounds_mismatch": True,
     },
 }
 
@@ -174,6 +205,8 @@ def build_partitions(c_size: str, e_size: str, layout: str = "adjacent") -> list
         e_start = align_up(c_end + 1, ALIGNMENT_SECTORS) + ALIGNMENT_SECTORS
     elif layout == "unaligned":
         e_start = c_end + 1
+    elif layout == "overlap":
+        e_start = c_end - ALIGNMENT_SECTORS + 1
     else:
         e_start = align_up(c_end + 1, ALIGNMENT_SECTORS)
     e_end = e_start + e_sectors - 1
@@ -373,6 +406,42 @@ def corrupt_payload_marker(path: Path, partition: dict[str, Any]) -> None:
         handle.write(b"corrupted-payload-marker")
 
 
+def corrupt_primary_gpt_header(path: Path) -> None:
+    with path.open("r+b") as handle:
+        handle.seek(SECTOR_SIZE)
+        handle.write(b"BROKEN!!")
+
+
+def corrupt_backup_gpt_header(path: Path) -> None:
+    with path.open("r+b") as handle:
+        handle.seek(path.stat().st_size - SECTOR_SIZE)
+        handle.write(b"BROKEN!!")
+
+
+def corrupt_gpt_entry_crc(path: Path) -> None:
+    with path.open("r+b") as handle:
+        handle.seek(SECTOR_SIZE + 88)
+        handle.write(b"\x00\x00\x00\x00")
+
+
+def truncate_image(path: Path) -> None:
+    with path.open("r+b") as handle:
+        handle.truncate(path.stat().st_size - SECTOR_SIZE)
+
+
+def mutate_manifest(path: Path, config: dict[str, Any]) -> None:
+    manifest_path = path.with_suffix(path.suffix + ".manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    disk = manifest["disk"]
+    if config["manifest_sector_size_mismatch"]:
+        disk["sector_size"] = 4096
+    if config["manifest_disk_size_mismatch"]:
+        disk["size_bytes"] = int(disk["size_bytes"]) + SECTOR_SIZE
+    if config["manifest_partition_bounds_mismatch"]:
+        disk["partitions"][1]["start_sector"] = int(disk["partitions"][1]["start_sector"]) + 1
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+
 def build_config(args: argparse.Namespace) -> dict[str, Any]:
     config = dict(DEFAULT_IMAGE_CONFIG)
     config.update(SCENARIO_PRESETS.get(args.scenario, {}))
@@ -417,7 +486,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Modeled minimum free bytes to preserve on E after shrink. Default: 1GiB.",
     )
     parser.add_argument("--partition-table", choices=("gpt", "mbr"), help="Partition table. Default: gpt.")
-    parser.add_argument("--layout", choices=("adjacent", "non-adjacent", "unaligned"), help="Partition geometry layout.")
+    parser.add_argument("--layout", choices=("adjacent", "non-adjacent", "unaligned", "overlap"), help="Partition geometry layout.")
     parser.add_argument("--c-filesystem-state", choices=("clean", "dirty"), help="Modeled C filesystem state.")
     parser.add_argument("--e-filesystem-state", choices=("clean", "dirty"), help="Modeled E filesystem state.")
     parser.add_argument("--c-encrypted", action="store_true", help="Mark C encrypted in the manifest.")
@@ -467,6 +536,17 @@ def main(argv: list[str] | None = None) -> int:
     ]
     if config["corrupt_payload_marker"]:
         actions.append("corrupt E payload marker")
+    for flag, action in (
+        ("corrupt_primary_gpt_header", "corrupt primary GPT header"),
+        ("corrupt_backup_gpt_header", "corrupt backup GPT header"),
+        ("corrupt_gpt_entry_crc", "corrupt GPT entry CRC"),
+        ("truncate_image", "truncate image by one sector"),
+        ("manifest_sector_size_mismatch", "mutate manifest sector size"),
+        ("manifest_disk_size_mismatch", "mutate manifest disk size"),
+        ("manifest_partition_bounds_mismatch", "mutate manifest partition bounds"),
+    ):
+        if config[flag]:
+            actions.append(action)
     for action in actions:
         print(f"+ {action}")
     if args.dry_run:
@@ -497,6 +577,16 @@ def main(argv: list[str] | None = None) -> int:
         )
     if config["corrupt_payload_marker"]:
         corrupt_payload_marker(output, partitions[1])
+    if not config["malformed_manifest"]:
+        mutate_manifest(output, config)
+    if config["corrupt_primary_gpt_header"]:
+        corrupt_primary_gpt_header(output)
+    if config["corrupt_backup_gpt_header"]:
+        corrupt_backup_gpt_header(output)
+    if config["corrupt_gpt_entry_crc"]:
+        corrupt_gpt_entry_crc(output)
+    if config["truncate_image"]:
+        truncate_image(output)
     print(f"Created disposable raw image: {output}")
     print("Note: raw fallback images are partitioned but not NTFS-formatted.")
     return 0
