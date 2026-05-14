@@ -373,6 +373,31 @@ class RawImageNormalizationTests(unittest.TestCase):
         self.assertTrue(gate["checks"]["generated_artifacts_ignored"])
         self.assertTrue(all(item["ignored"] for item in gate["ignored_artifacts"]))
 
+    def test_windows_handoff_bundle_excludes_large_images(self) -> None:
+        result = self.run_script("create_windows_handoff.py", "--skip-vm-plan", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        handoff = json.loads(result.stdout)
+        self.created_dirs.append(Path(handoff["run_dir"]))
+        mac_gate = json.loads(Path(handoff["mac_gate"]["source_path"]).read_text(encoding="utf-8"))
+        batch_report = json.loads(Path(handoff["batch_report"]["source_path"]).read_text(encoding="utf-8"))
+        self.created_dirs.append(Path(mac_gate["run_dir"]))
+        self.created_dirs.append(Path(batch_report["run_dir"]))
+        for scenario in batch_report["scenarios"]:
+            image = Path(scenario["artifacts"]["image"])
+            manifest = Path(scenario["artifacts"]["manifest"])
+            self.created.append(image)
+            self.created.append(manifest)
+
+        self.assertEqual(handoff["schema"], "partition-lab.windows-handoff.v1")
+        self.assertEqual(handoff["status"], "ready-for-windows")
+        self.assertTrue(Path(handoff["run_dir"], "windows-handoff.json").exists())
+        self.assertTrue(handoff["excluded_large_artifacts"])
+        self.assertTrue(
+            all(Path(item["bundle_path"]).suffix == ".json" for item in handoff["copied_artifacts"])
+        )
+        self.assertIn("plan-windows-ntfs", {item["id"] for item in handoff["next_windows_commands"]})
+
     def test_command_plan_reports_stable_blockers_for_unsafe_scenarios(self) -> None:
         cases = {
             "mbr-layout": "partition-table-not-gpt",
